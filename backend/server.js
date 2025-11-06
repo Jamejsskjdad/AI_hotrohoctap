@@ -16,6 +16,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { OpenAI } = require("openai");
+const { SYSTEM_ANALYZE, USER_SCHEMA } = require("./prompt");
 
 const app = express();
 app.get('/health', (req, res) => res.json({ ok: true, pid: process.pid }));
@@ -168,20 +169,8 @@ app.post("/api/analyze", async (req, res) => {
     raw_text = String(raw_text).replace(/^\s*gi[a-â]i.*?:?/i, "").trim();
 
     const messages = [
-      { role: "system", content: "Bạn là trợ lý Toán học tiếng Việt. Hãy CHỈ trả về JSON đúng schema (không giải thích ngoài)." },
-      { role: "user", content:
-`Văn bản (mỗi dòng là một phương trình ax+by+cz=d):
-${raw_text}
-
-YÊU CẦU: Trả về JSON đúng schema:
-{
-  "normalized_problem": "LaTeX ba phương trình",
-  "detected_method": "substitution|elimination|matrix|unknown",
-  "step_errors": [{"step":1,"code":"L1|L2|L3|L4","what":"mô tả","fix":"cách sửa"}],
-  "model_solution": "LaTeX lời giải đầy đủ. Không đặt chữ ngay bên phải \\end{cases}; toàn bộ diễn giải nằm trong một khối \\begin{align*}...\\end{align*} riêng, xuống dòng bằng \\\\.",
-  "feedback_short": "gạch đầu dòng ngắn gọn"
-}
-KHÔNG thêm văn bản ngoài JSON.` }
+      { role: "system", content: SYSTEM_ANALYZE },                           // <-- dùng prompt đầy đủ
+      { role: "user", content: `Văn bản (mỗi dòng là ax+by+cz=d):\n${raw_text}\n\nTrả JSON đúng theo schema sau, KHÔNG thêm chữ ngoài JSON:\n${USER_SCHEMA}` }
     ];
 
     const r = await openai.chat.completions.create({
@@ -189,22 +178,34 @@ KHÔNG thêm văn bản ngoài JSON.` }
       temperature: 0.2,
       messages,
       response_format: { type: "json_object" },
-      max_tokens: 800
+      max_tokens: 1200
     });
 
     const text = r.choices?.[0]?.message?.content || "{}";
-    console.log("ANALYZE_RAW =", text);
-
     let json;
     try { json = JSON.parse(text); }
     catch { return res.json({ error: "BAD_JSON", raw: text }); }
 
-    // Guards + normalize
-    json.step_errors        ||= [];
-    json.detected_method    ||= "unknown";
-    json.feedback_short     ||= "";
-    json.normalized_problem  = normalizeLatex(json.normalized_problem || "");
-    json.model_solution      = normalizeLatex(json.model_solution || "");
+    // ===== Guards + normalize đồng bộ với frontend =====
+    json.step_errors           ||= [];
+    json.fix_suggestions       ||= [];
+    json.solution_card         ||= null;
+    json.detected_method       ||= "unknown";
+    json.feedback_short        ||= "";
+
+    // Chuẩn hoá LaTeX
+    json.normalized_problem     = normalizeLatex(json.normalized_problem || "");
+    // Hỗ trợ cả 2 tên khoá (cũ/new)
+    const modelSol              = json.model_solution_latex || json.model_solution || "";
+    json.model_solution_latex   = sanitizeModelSolution(modelSol);
+
+    // Chuẩn hoá LaTeX trong fix_suggestions (nếu có)
+    if (Array.isArray(json.fix_suggestions)) {
+      json.fix_suggestions = json.fix_suggestions.map(s => ({
+        ...s,
+        latex: s?.latex ? sanitizeModelSolution(String(s.latex)) : ""
+      }));
+    }
 
     return res.json(json);
   } catch (e) {
@@ -213,6 +214,11 @@ KHÔNG thêm văn bản ngoài JSON.` }
   }
 });
 
+// Stub tránh 404 từ frontend khi log
+app.post("/api/report", (req, res) => {
+  // TODO: nối Google Sheets nếu muốn; hiện tại trả 204 cho nhanh
+  return res.status(204).end();
+});
 // start server
 const PORT = process.env.PORT || 8787;
 app.listen(PORT, () => console.log(`Backend listening on ${PORT}`));
