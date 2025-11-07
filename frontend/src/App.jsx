@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import Tesseract from "tesseract.js";
 import "./style.css";
 import MathBlock from "./components/MathBlock.jsx";
 
@@ -13,22 +12,39 @@ function safeStr(v) {
 
 export default function App() {
   const fileRef = useRef(null);
-  const [preview, setPreview] = useState("");
-  const [rawText, setRawText] = useState("");
+     const [previews, setPreviews] = useState([]);     // NEW: nhiều ảnh
+     const [rawText, setRawText] = useState("");       // plain_text từ OCR
+     const [ocrLatex, setOcrLatex] = useState(""); 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  async function handleFile(e) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setPreview(String(ev.target?.result || ""));
-    reader.readAsDataURL(f);
-
-    setLoading(true);
-    const { data } = await Tesseract.recognize(f, "eng", { tessjs_create_tsv: "1" });
-    setRawText(data.text || "");
-    setLoading(false);
+  async function handleFiles(e) {                    // NEW
+         const files = Array.from(e.target.files || []);
+         if (!files.length) return;
+    
+         // hiển thị preview nhiều ảnh
+         const pv = await Promise.all(files.map(f => new Promise(res => {
+           const r = new FileReader();
+           r.onload = ev => res(String(ev.target?.result || ""));
+           r.readAsDataURL(f);
+        })));
+         setPreviews(pv);
+    
+         // gửi FormData đến /api/ocr
+         setLoading(true);
+         const fd = new FormData();
+         files.forEach(f => fd.append("files", f));
+         try {
+           const ocr = await fetch(`${API_BASE}/api/ocr`, { method: "POST", body: fd })
+             .then(r => r.json());
+           if (ocr?.error) throw new Error(ocr.error);
+           setRawText(ocr.plain_text || "");
+           setOcrLatex(ocr.latex || "");
+         } catch (err) {
+           alert("OCR lỗi, vui lòng thử lại.\n" + (err?.message || ""));
+         } finally {
+           setLoading(false);
+         }
   }
 
   async function analyze() {
@@ -66,8 +82,8 @@ export default function App() {
   }
 
   function resetAll() {
-    setPreview("");
-    setRawText("");
+    setPreviews([]);
+    setOcrLatex("");
     setResult(null);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -83,12 +99,14 @@ export default function App() {
         </div>
 
         <div className="upload" onClick={() => fileRef.current?.click()}>
-          <i className={`fa-solid ${preview ? "fa-check-circle" : "fa-cloud-upload-alt"} icon`} />
-          <div className="label">Tải lên ảnh lời giải của học sinh</div>
-          <p className="hint">Nhấn để chọn ảnh (JPG, PNG)</p>
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
-          {preview && <img src={preview} className="preview" />}
-        </div>
+           <i className={`fa-solid ${previews.length ? "fa-check-circle" : "fa-cloud-upload-alt"} icon`} />
+           <div className="label">Tải lên ảnh lời giải của học sinh</div>
+           <p className="hint">Chọn **nhiều** ảnh (JPG/PNG)</p>
+           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={handleFiles} />
+           {previews.length > 0 && previews.map((src, i) => (
+             <img key={i} src={src} className="preview" />
+           ))}
+         </div>
 
         <div className="btns">
           <button className="btn primary" disabled={!rawText || loading} onClick={analyze}>
@@ -105,7 +123,12 @@ export default function App() {
             <pre className="pre">{rawText}</pre>
           </details>
         )}
-
+        {ocrLatex && (
+          <details className="box">
+             <summary>LaTeX OCR (xem/ẩn)</summary>
+             <MathBlock latex={ocrLatex} />
+           </details>
+         )}
         {result && (
           <section id="result" className="box">
             <h2><i className="fa-solid fa-clipboard-check" /> Kết quả phân tích</h2>

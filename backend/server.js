@@ -17,6 +17,12 @@ const express = require("express");
 const cors = require("cors");
 const { OpenAI } = require("openai");
 const { SYSTEM_ANALYZE, USER_SCHEMA } = require("./prompt");
+const multer = require("multer");
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }  // 10MB/ảnh (bạn chỉnh tùy ý)
+});
+const { SYSTEM_OCR } = require("./prompt");
 
 const app = express();
 app.get('/health', (req, res) => res.json({ ok: true, pid: process.pid }));
@@ -157,6 +163,59 @@ function sanitizeModelSolution(s) {
   t = normalizeLatex(t);
   return t;
 }
+// =============== OCR bằng model vision (nhiều ảnh) ===============
+app.post("/api/ocr", upload.array("files", 12), async (req, res) => {
+  try {
+    const files = req.files || [];
+    if (!files.length) return res.status(400).json({ error: "NO_FILE" });
+
+    // Chuyển mỗi ảnh -> data URL (để truyền vào OpenAI chat vision)
+    const parts = [];
+    parts.push({ type: "text", text: "Ảnh bài làm của học sinh. Hãy trích xuất theo yêu cầu." });
+    for (const f of files) {
+      const mime = f.mimetype || "image/jpeg";
+      const b64 = Buffer.from(f.buffer).toString("base64");
+      parts.push({
+        type: "image_url",
+        image_url: { url: `data:${mime};base64,${b64}` }
+      });
+    }
+
+    const messages = [
+      { role: "system", content: SYSTEM_OCR },
+      { role: "user", content: parts }
+    ];
+
+    // Dùng cùng baseURL & khóa như /api/analyze
+    const r = await openai.chat.completions.create({
+      model: "gpt-4o-mini",          // cùng model “đang dùng để đưa ra lời giải”
+      temperature: 0.0,
+      messages,
+      response_format: { type: "json_object" },
+      max_tokens: 1200
+    });
+
+    const text = r.choices?.[0]?.message?.content || "{}";
+    let json;
+    try { json = JSON.parse(text); }
+    catch { return res.json({ error: "BAD_JSON", raw: text }); }
+
+    // Bảo hiểm trường
+    json.plain_text = String(json.plain_text || "").trim();
+    json.latex      = String(json.latex      || "").trim();
+    json.notes      = String(json.notes      || "").trim();
+
+    // Chuẩn hoá LaTeX nhẹ để hiển thị đẹp (dùng helper sẵn có)
+    json.latex = normalizeLatex(json.latex);
+
+    return res.json(json);
+
+  } catch (e) {
+    console.error("ocr error:", e);
+    // yêu cầu: model lỗi thì báo để reload (không fallback tesseract)
+    return res.status(500).json({ error: e?.message || "OCR_FAIL" });
+  }
+});
 
 /* =========================== API =========================== */
 
@@ -174,11 +233,11 @@ app.post("/api/analyze", async (req, res) => {
     ];
 
     const r = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       temperature: 0.2,
       messages,
       response_format: { type: "json_object" },
-      max_tokens: 1200
+      max_tokens: 10000
     });
 
     const text = r.choices?.[0]?.message?.content || "{}";
