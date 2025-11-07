@@ -39,7 +39,6 @@ export default function App() {
              .then(r => r.json());
            if (ocr?.error) throw new Error(ocr.error);
            setRawText(ocr.plain_text || "");
-           setOcrLatex(ocr.latex || "");
          } catch (err) {
            alert("OCR lỗi, vui lòng thử lại.\n" + (err?.message || ""));
          } finally {
@@ -122,13 +121,7 @@ export default function App() {
             <summary>Văn bản OCR</summary>
             <pre className="pre">{rawText}</pre>
           </details>
-        )}
-        {ocrLatex && (
-          <details className="box">
-             <summary>LaTeX OCR (xem/ẩn)</summary>
-             <MathBlock latex={ocrLatex} />
-           </details>
-         )}
+        )}       
         {result && (
           <section id="result" className="box">
             <h2><i className="fa-solid fa-clipboard-check" /> Kết quả phân tích</h2>
