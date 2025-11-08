@@ -147,30 +147,7 @@ export default function App() {
                 <div className="text-gray-500">Không phát hiện lỗi nào hoặc kết quả rỗng.</div>
               )}
             </div>
-            {/* So sánh máy ↔ học sinh */}
-            {result?.compare && (
-              <div className="subbox">
-                <h3 className="title"><i className="fa-solid fa-scale-balanced" /> So sánh với bài làm học sinh</h3>
-                <p><b>Kết luận:</b> {result.compare.verdict} — {result.compare.reason}</p>
-
-                {Array.isArray(result.compare.steps_alignment) && result.compare.steps_alignment.length > 0 && (
-                  <div style={{marginTop: 8}}>
-                    <b>Căn chỉnh theo bước:</b>
-                    <ul>
-                      {result.compare.steps_alignment.map((a,i)=>(
-                        <li key={i}><b>Bước {a.student_step_index ?? "?"} ({a.verdict})</b> — {a.what}{a.fix ? ` (Sửa: ${a.fix})` : ""}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {Array.isArray(result.compare.differences) && result.compare.differences.length > 0 && (
-                  <div style={{marginTop: 8}}>
-                    <b>Khác biệt chính:</b>
-                    <ul>{result.compare.differences.map((d,i)=><li key={i}>{d}</li>)}</ul>
-                  </div>
-                )}
-              </div>
-            )}
+           
 
             {/* Gợi ý sửa lỗi */}
             <div className="subbox" style={{ background: "#FFF6E5" }}>
