@@ -13,8 +13,7 @@ function safeStr(v) {
 export default function App() {
   const fileRef = useRef(null);
      const [previews, setPreviews] = useState([]);     // NEW: nhiều ảnh
-     const [rawText, setRawText] = useState("");       // plain_text từ OCR
-     const [ocrLatex, setOcrLatex] = useState(""); 
+     const [rawText, setRawText] = useState("");       // plain_text từ OCR    
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -81,14 +80,14 @@ export default function App() {
   }
 
   function resetAll() {
-    setPreviews([]);
-    setOcrLatex("");
+    setPreviews([]);   
     setResult(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const fullSolution = safeStr(result?.model_solution_latex ?? result?.model_solution);
-
+  const fullSolution = safeStr(
+    result?.model_solution_latex ?? result?.model_solution ?? ""
+  );
   return (
     <main className="wrap">
       <div className="card">
@@ -140,7 +139,8 @@ export default function App() {
               {(result.step_errors?.length ?? 0) > 0 ? (
                 result.step_errors.map((e, i) => (
                   <div key={i} className="error">
-                    <b>{e.code}</b> — {e.what} (Sửa: {e.fix})
+                    <b>{e.step != null ? `Bước ${e.step}` : "Bước ?"} — {e.code}</b> — {e.what}
+                    {e.fix ? ` (Sửa: ${e.fix})` : ""}
                   </div>
                 ))
               ) : (
@@ -178,7 +178,8 @@ export default function App() {
                 </details>
 
                 {/* Tóm tắt gọn (nếu có) */}
-                {result.solution_card?.solution_summary && (
+                {result.solution_card?.solution_summary && 
+                result.solution_card.solution_summary !== "unknown" &&(
                   <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
                     <b>Nghiệm:</b>
                     {(/[\\^_{}]|\\frac|\\dfrac|\\left|\\right/.test(result.solution_card.solution_summary))
@@ -202,11 +203,11 @@ export default function App() {
                 )}
 
                 {/* Bản LaTeX đầy đủ */}
-                {fullSolution && (
+                {fullSolution.length > 0 ? (
                   <div className="subbox" style={{ marginTop: 12 }}>
                     <MathBlock latex={fullSolution} />
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </section>
