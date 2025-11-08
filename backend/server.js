@@ -188,7 +188,7 @@ app.post("/api/ocr", upload.array("files", 12), async (req, res) => {
 
     // Dùng cùng baseURL & khóa như /api/analyze
     const r = await openai.chat.completions.create({
-      model: "gpt-4o-mini",          // cùng model “đang dùng để đưa ra lời giải”
+      model: "gpt-4o",          // cùng model “đang dùng để đưa ra lời giải”
       temperature: 0.0,
       messages,
       response_format: { type: "json_object" },
