@@ -49,7 +49,7 @@ export default function App() {
     if (!rawText) return;
     setLoading(true);
     const t0 = performance.now();
-    const analyzed = await fetch(`${API_BASE}/api/analyze`, {
+    const analyzed = await fetch(`${API_BASE}/api/grade`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ raw_text: rawText }),
@@ -167,7 +167,6 @@ export default function App() {
                 <div className="text-gray-500">Chưa có gợi ý cụ thể.</div>
               )}
             </div>
-
             {/* Lời giải đúng */}
             <div className="subbox" style={{ background: "#e8f5e9" }}>
               <h3 className="title ok"><i className="fa-solid fa-circle-check" /> Lời giải đúng</h3>

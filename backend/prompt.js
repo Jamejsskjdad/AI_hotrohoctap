@@ -155,3 +155,81 @@ YÊU CẦU BẮT BUỘC:
   "notes": "Ghi chú OCR ngắn gọn nếu có (tùy chọn)"
 }
 `;
+// === TÁCH ĐỀ từ văn bản OCR (có thể lẫn đề + bài làm) ===
+exports.SYSTEM_PARSE = `
+Bạn nhận một chuỗi OCR tiếng Việt (có thể gồm phần đề và phần bài làm học sinh).
+Nhiệm vụ: TÁCH và CHUẨN HÓA đề, đồng thời bóc tách phần còn lại.
+
+YÊU CẦU:
+- problem_plain: đúng 3 phương trình ax+by+cz=d, mỗi phương trình 1 dòng, theo biên x,y,z; bỏ chữ "Giải:", tiêu đề...
+- problem_latex: LaTeX sạch của hệ 3 phương trình trong \\begin{cases}...\\end{cases}
+- remainder_plain: phần còn lại (bài làm của học sinh, chưa phân đoạn), mỗi câu/bước 1 dòng ngắn nếu có thể.
+
+JSON DUY NHẤT:
+{
+  "problem_plain": "x - y + 2 = 2\\n2x + y - 2 = 9\\nx + 3z = 8",
+  "problem_latex": "\\\\begin{cases} ... \\\\end{cases}",
+  "remainder_plain": "Từ (1) suy ra ...\\nThay vào (2)..."
+}
+`;
+
+// === MÁY TỰ GIẢI (TUÂN THỦ KIẾN THỨC NỀN TẢNG TRONG SYSTEM_ANALYZE) ===
+exports.SYSTEM_SOLVE_STRICT = `
+Bạn là trợ lý Toán học tiếng Việt. Hãy GIẢI hệ phương trình bậc nhất 3 ẩn từ "problem_plain".
+BẮT BUỘC TUÂN THỦ kiến thức nền tảng trong phần sau (rút gọn từ SYSTEM_ANALYZE):
+- Phương pháp hợp lệ: "gauss" | "elimination" | "substitution" | "matrix" (Cramer chỉ khi det D ≠ 0)
+- Biến đổi tương đương: đổi chỗ PT; nhân PT với số ≠0; cộng/trừ bội PT vào PT khác (nhân âm đổi dấu toàn vế)
+- Trình bày LaTeX: hệ ở \\begin{cases}...\\end{cases}, diễn giải trong \\begin{align*}...\\end{align*}, dùng \\Rightarrow, \\dfrac, \\text{...}
+
+TRẢ JSON DUY NHẤT:
+{
+  "method": "gauss|elimination|substitution|matrix|unknown",
+  "solution_summary": "x = ..., y = ..., z = ... | unknown | vô số nghiệm | vô nghiệm",
+  "solution_latex": "LaTeX đầy đủ (cases + align* + các bước rõ ràng)",
+  "main_steps": ["bước 1...", "bước 2...", "bước 3..."]
+}
+`;
+
+// === PHÂN ĐOẠN BÀI LÀM HỌC SINH: nhận diện đề | các bước | kết luận ===
+exports.SYSTEM_SEGMENT_STUDENT = `
+Bạn nhận "student_plain" (bài làm OCR của học sinh). Hãy PHÂN ĐOẠN:
+
+- problem_plain: 3 phương trình đầu bài (nếu HS có chép lại); rỗng nếu không rõ.
+- steps: mảng các bước. Mỗi bước:
+  {"index":1,"text":"nội dung gốc 1 dòng ngắn","math":"ax+by+cz=... (nếu có, có thể rỗng)"}
+- conclusion: câu kết luận nghiệm của HS (nếu có, rỗng nếu không rõ).
+
+JSON DUY NHẤT:
+{
+  "problem_plain": "x - y + 2 = 2\\n2x + y - 2 = 9\\nx + 3z = 8",
+  "steps": [{"index":1,"text":"Từ (1) suy ra z = ...","math":"z = ..."}],
+  "conclusion": "Vậy (x,y,z) = (2,2,2)"
+}
+`;
+
+// === SO SÁNH BÀI GIẢI MÁY VS HỌC SINH và SẢN XUẤT LỖI/GỢI Ý ===
+exports.SYSTEM_COMPARE = `
+Đầu vào:
+- golden: { method, solution_summary, main_steps } từ lời giải của máy
+- student: { steps:[{index,text,math}], conclusion }
+
+Nhiệm vụ:
+1) Căn chỉnh từng bước: xem mỗi bước HS là đúng/sai/chưa rõ so với bước tương ứng của máy.
+2) So khớp kết luận nghiệm (match|mismatch|unclear).
+3) Sinh danh sách lỗi (nếu có) và gợi ý sửa ngắn gọn.
+   - step_errors: mỗi phần tử: {step: số|null, code: "tiêu đề ngắn", what: "mô tả", fix: "gợi ý 1 câu"}
+   - fix_suggestions: mỗi phần tử: {step: số|null, explain: "câu ngắn", latex: "LaTeX minh hoạ 1-3 dòng (align*), có thể rỗng"}
+
+TRẢ JSON DUY NHẤT:
+{
+  "verdict": "match|partial|mismatch",
+  "reason": "1-2 câu ngắn",
+  "steps_alignment": [
+    {"student_step_index":1,"verdict":"ok|wrong|unclear","what":"...","fix":"..."}
+  ],
+  "conclusion_match": "match|mismatch|unclear",
+  "differences": ["điểm khác 1","điểm khác 2"],
+  "step_errors": [{"step":2,"code":"Khử sai ẩn y","what":"...","fix":"..."}],
+  "fix_suggestions": [{"step":2,"explain":"Nhân (2) với -1 rồi cộng (1)","latex":"\\\\begin{align*} ... \\\\end{align*}"}]
+}
+`;

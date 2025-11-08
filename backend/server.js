@@ -16,13 +16,14 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { OpenAI } = require("openai");
-const { SYSTEM_ANALYZE, USER_SCHEMA } = require("./prompt");
+const { SYSTEM_ANALYZE, USER_SCHEMA, SYSTEM_OCR,
+        SYSTEM_PARSE, SYSTEM_SOLVE_STRICT, SYSTEM_SEGMENT_STUDENT, SYSTEM_COMPARE } = require("./prompt");
 const multer = require("multer");
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }  // 10MB/ảnh (bạn chỉnh tùy ý)
 });
-const { SYSTEM_OCR } = require("./prompt");
+
 
 const app = express();
 app.get('/health', (req, res) => res.json({ ok: true, pid: process.pid }));
@@ -278,6 +279,149 @@ app.post("/api/report", (req, res) => {
   // TODO: nối Google Sheets nếu muốn; hiện tại trả 204 cho nhanh
   return res.status(204).end();
 });
+app.post("/api/grade", async (req, res) => {
+  try {
+    const { raw_text } = req.body || {};
+    if (!raw_text) return res.status(400).json({ error: "NO_TEXT" });
+
+    // 1) PARSE: tách đề + phần còn lại
+    const r1 = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.0,
+      response_format: { type: "json_object" },
+      max_tokens: 1500,
+      messages: [
+        { role: "system", content: SYSTEM_PARSE },
+        { role: "user", content: String(raw_text) }
+      ]
+    });
+    let parsed = {};
+    try { parsed = JSON.parse(r1.choices?.[0]?.message?.content || "{}"); }
+    catch { return res.json({ error: "BAD_JSON_PARSE", raw: r1.choices?.[0]?.message?.content }); }
+
+    parsed.problem_plain = String(parsed.problem_plain || "").trim();
+    parsed.problem_latex = normalizeLatex(parsed.problem_latex || "");
+    const student_plain  = String(parsed.remainder_plain || "").trim();
+    if (!parsed.problem_plain) {
+      return res.status(400).json({ error: "NO_PROBLEM_DETECTED", parsed });
+    }
+
+    // 2) SOLVE (STRICT): máy tự giải theo kiến thức nền tảng
+    const r2 = await openai.chat.completions.create({
+      model: "gpt-4o",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      max_tokens: 4000,
+      messages: [
+        { role: "system", content: SYSTEM_SOLVE_STRICT },
+        { role: "user", content: `problem_plain:\n${parsed.problem_plain}` }
+      ]
+    });
+    let solved = {};
+    try { solved = JSON.parse(r2.choices?.[0]?.message?.content || "{}"); }
+    catch { return res.json({ error: "BAD_JSON_SOLVE", raw: r2.choices?.[0]?.message?.content }); }
+
+    solved.method           = String(solved.method || "unknown");
+    solved.solution_summary = String(solved.solution_summary || "").trim();
+    solved.solution_latex   = sanitizeModelSolution(String(solved.solution_latex || ""));
+    if (!Array.isArray(solved.main_steps)) solved.main_steps = [];
+
+    // 3) SEGMENT_STUDENT: phân đoạn bài làm học sinh
+    const r3 = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.0,
+      response_format: { type: "json_object" },
+      max_tokens: 2000,
+      messages: [
+        { role: "system", content: SYSTEM_SEGMENT_STUDENT },
+        { role: "user", content: `student_plain:\n${student_plain || raw_text}` }
+      ]
+    });
+    let student = {};
+    try { student = JSON.parse(r3.choices?.[0]?.message?.content || "{}"); }
+    catch { return res.json({ error: "BAD_JSON_SEGMENT", raw: r3.choices?.[0]?.message?.content }); }
+    if (!Array.isArray(student.steps)) student.steps = [];
+    student.problem_plain = String(student.problem_plain || "").trim();
+    student.conclusion    = String(student.conclusion || "").trim();
+
+    // 4) COMPARE: so sánh theo bước + so khớp kết luận
+    const r4 = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.0,
+      response_format: { type: "json_object" },
+      max_tokens: 2500,
+      messages: [
+        { role: "system", content: SYSTEM_COMPARE },
+        { role: "user", content:
+`golden:
+${JSON.stringify({ method: solved.method, solution_summary: solved.solution_summary, main_steps: solved.main_steps }, null, 2)}
+
+student:
+${JSON.stringify({ steps: student.steps, conclusion: student.conclusion }, null, 2)}`
+        }
+      ]
+    });
+    let compared = {};
+    try { compared = JSON.parse(r4.choices?.[0]?.message?.content || "{}"); }
+    catch { return res.json({ error: "BAD_JSON_COMPARE", raw: r4.choices?.[0]?.message?.content }); }
+    compared.verdict ||= "partial";
+    compared.reason  ||= "";
+    if (!Array.isArray(compared.steps_alignment)) compared.steps_alignment = [];
+    if (!Array.isArray(compared.differences))     compared.differences     = [];
+    if (!Array.isArray(compared.step_errors))     compared.step_errors     = [];
+    if (!Array.isArray(compared.fix_suggestions)) compared.fix_suggestions = [];
+
+    // 5) ĐÓNG GÓI: giữ UI cũ + bổ sung khối mới
+    // Map sang tiếng Việt trước khi gửi ra frontend
+    const methodMap = {
+      elimination: "Phương pháp cộng đại số (Khử ẩn dần)",
+      substitution: "Phương pháp thế",
+      matrix: "Phương pháp ma trận (Cramer)",
+      gauss: "Phương pháp khử Gauss",
+      unknown: "Không xác định"
+    };
+    const method_vi = methodMap[solved.method] || solved.method;
+
+    const payload = {
+      normalized_problem: parsed.problem_latex,
+      model_solution_latex: solved.solution_latex,
+      solution_card: {
+        solution_summary: solved.solution_summary || "",
+        method_used: method_vi,
+        main_steps: solved.main_steps || []
+      },
+
+
+      // LỖI & GỢI Ý sau khi (đã) so sánh:
+      step_errors: compared.step_errors,
+      fix_suggestions: compared.fix_suggestions,
+
+      // Khối mới để hiển thị nếu muốn:
+      golden: {
+        problem_plain: parsed.problem_plain,
+        problem_latex: parsed.problem_latex,
+        method: solved.method,
+        solution_summary: solved.solution_summary,
+        solution_latex: solved.solution_latex,
+        main_steps: solved.main_steps
+      },
+      student,     // { problem_plain, steps[], conclusion }
+      compare: {   // tên ngắn gọn
+        verdict: compared.verdict,
+        reason: compared.reason,
+        steps_alignment: compared.steps_alignment,
+        conclusion_match: compared.conclusion_match || "unclear",
+        differences: compared.differences
+      }
+    };
+
+    return res.json(payload);
+  } catch (e) {
+    console.error("grade error:", e);
+    return res.status(500).json({ error: e?.message || "GRADE_FAIL" });
+  }
+});
+
 // start server
 const PORT = process.env.PORT || 8787;
 app.listen(PORT, () => console.log(`Backend listening on ${PORT}`));
