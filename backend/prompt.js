@@ -225,7 +225,13 @@ TRẢ JSON DUY NHẤT:
   "verdict": "match|partial|mismatch",
   "reason": "1-2 câu ngắn",
   "steps_alignment": [
-    {"student_step_index":1,"verdict":"ok|wrong|unclear","what":"...","fix":"..."}
+    {
+      "student_step_index": 1,                       // 1-based hoặc null
+      "verdict": "ok|wrong|missing|extra|mismatch|error",
+      "what": "mô tả ngắn",
+      "fix": "gợi ý sửa ngắn",
+      "latex_fix": "\\begin{align*} ... \\end{align*}"  // tùy chọn
+    }
   ],
   "conclusion_match": "match|mismatch|unclear",
   "differences": ["điểm khác 1","điểm khác 2"],

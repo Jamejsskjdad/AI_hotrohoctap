@@ -6,8 +6,7 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (err) => {
   console.error('[unhandledRejection]', err);
 });
-process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
-process.on('unhandledRejection', (err) => console.error('[unhandledRejection]', err));
+
 process.on('exit', (code)=> console.error('[process exit]', code));
 process.on('SIGTERM', ()=> { console.error('[SIGTERM]'); });
 process.on('SIGINT',  ()=> { console.error('[SIGINT]'); });
@@ -37,6 +36,64 @@ const openai = new OpenAI({
 });
 
 /* ================= Helpers: hậu xử lý LaTeX ================= */
+/** Map từ compared.steps_alignment -> step_errors & fix_suggestions (chuẩn hoá tiếng Việt) */
+function mapCompareToErrors(compared) {
+  const outErrors = [];
+  const outFixes  = [];
+
+  if (!compared || !Array.isArray(compared.steps_alignment)) {
+    return { step_errors: outErrors, fix_suggestions: outFixes };
+  }
+
+  // Chuẩn hoá verdict -> "mã lỗi" ngắn gọn tiếng Việt
+  const verdict2Code = {
+    wrong:   "Sai biến đổi",
+    missing: "Thiếu bước",
+    extra:   "Bước thừa",
+    mismatch:"Không khớp",
+    error:   "Lỗi",
+    ok:      "Đúng"
+  };
+
+  for (const align of compared.steps_alignment) {
+    const verdict = String(align?.verdict || "").toLowerCase().trim();
+    if (!verdict || verdict === "ok") continue; // chỉ lấy bước lỗi
+
+    const step = Number.isFinite(align?.student_step_index)
+      ? align.student_step_index
+      : null;
+
+    // câu ngắn gọn
+    const code = verdict2Code[verdict] || "Sai thao tác";
+    const what = String(align?.what || "Bước làm không khớp với lời giải chuẩn.").trim();
+    const fix  = String(align?.fix  || "Thực hiện lại bước theo phương pháp khử/thế đúng.").trim();
+
+    outErrors.push({ step, code, what, fix });
+
+    // Nếu có LaTeX minh hoạ từ so sánh thì đưa vào fix_suggestions
+    const latexFix = String(align?.latex_fix || "").trim();
+    if (latexFix) {
+      outFixes.push({
+        step,
+        explain: fix,
+        latex: sanitizeModelSolution(latexFix)
+      });
+    }
+  }
+
+  // Nếu kết luận cuối cùng không khớp -> thêm lỗi L4
+  const concl = String(compared?.conclusion_match || "").toLowerCase();
+  if (concl === "mismatch" || String(compared?.verdict).toLowerCase() === "mismatch") {
+    outErrors.push({
+      step: null,
+      code: "Kết luận sai",
+      what: "Nghiệm kết luận của học sinh không khớp với nghiệm đúng.",
+      fix:  "Tính lại nghiệm x, y, z theo các bước khử/thế đã chuẩn."
+    });
+  }
+
+  return { step_errors: outErrors, fix_suggestions: outFixes };
+}
 
 // escape { } trong text thuần
 function escBraces(s) { return String(s).replace(/([{}])/g, "\\$1"); }
@@ -370,6 +427,12 @@ ${JSON.stringify({ steps: student.steps, conclusion: student.conclusion }, null,
     if (!Array.isArray(compared.differences))     compared.differences     = [];
     if (!Array.isArray(compared.step_errors))     compared.step_errors     = [];
     if (!Array.isArray(compared.fix_suggestions)) compared.fix_suggestions = [];
+    // === Map A: đảm bảo Lỗi/Gợi ý phản ánh đúng bảng so sánh ===
+    const mapped = mapCompareToErrors(compared);
+
+    // Nếu model cũng trả step_errors/fix_suggestions thì chỉ dùng làm "fallback"
+    const final_step_errors     = mapped.step_errors.length ? mapped.step_errors : compared.step_errors;
+    const final_fix_suggestions = mapped.fix_suggestions.length ? mapped.fix_suggestions : compared.fix_suggestions;
 
     // 5) ĐÓNG GÓI: giữ UI cũ + bổ sung khối mới
     // Map sang tiếng Việt trước khi gửi ra frontend
@@ -391,10 +454,9 @@ ${JSON.stringify({ steps: student.steps, conclusion: student.conclusion }, null,
         main_steps: solved.main_steps || []
       },
 
-
-      // LỖI & GỢI Ý sau khi (đã) so sánh:
-      step_errors: compared.step_errors,
-      fix_suggestions: compared.fix_suggestions,
+      // LỖI & GỢI Ý (map từ bảng so sánh => luôn khớp 100%)
+      step_errors: final_step_errors,
+      fix_suggestions: final_fix_suggestions,
 
       // Khối mới để hiển thị nếu muốn:
       golden: {
