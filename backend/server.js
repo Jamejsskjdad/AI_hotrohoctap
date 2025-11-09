@@ -372,7 +372,7 @@ app.post("/api/grade", async (req, res) => {
 
     // 1) PARSE: tách đề + phần còn lại
     const r1 = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       temperature: 0.0,
       response_format: { type: "json_object" },
       max_tokens: 1500,
@@ -414,7 +414,7 @@ app.post("/api/grade", async (req, res) => {
 
     // 3) SEGMENT_STUDENT: phân đoạn bài làm học sinh
     const r3 = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       temperature: 0.0,
       response_format: { type: "json_object" },
       max_tokens: 2000,
@@ -563,7 +563,7 @@ ${JSON.stringify(studentMin)}`
     let practice = { items: [] };
     try {
       const rP = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         temperature: 0.6,                // đa dạng hơn một chút
         response_format: { type: "json_object" },
         max_tokens: 2000,
