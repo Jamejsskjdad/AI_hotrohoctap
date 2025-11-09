@@ -37,6 +37,26 @@ const openai = new OpenAI({
 
 /* ================= Helpers: hậu xử lý LaTeX ================= */
 /** Map từ compared.steps_alignment -> step_errors & fix_suggestions (chuẩn hoá tiếng Việt) */
+function relaxedJsonParse(text) {
+  try { return JSON.parse(text); } catch (_) {}
+  if (!text) return null;
+  let t = String(text)
+    .replace(/```(json)?/gi, "")         // bỏ fenced code
+    .replace(/[“”]/g, '"')               // smart quotes -> "
+    .replace(/[‘’]/g, "'")
+    .replace(/\u00A0/g, " ");            // nbsp
+  // cắt theo cặp ngoặc nhọn đầu-cuối
+  const i = t.indexOf("{");
+  const j = t.lastIndexOf("}");
+  if (i >= 0 && j > i) {
+    t = t.slice(i, j + 1);
+    // bỏ dấu phẩy thừa trước ngoặc đóng
+    t = t.replace(/,\s*([}\]])/g, "$1");
+    try { return JSON.parse(t); } catch (_) {}
+  }
+  return null;
+}
+
 function mapCompareToErrors(compared) {
   const outErrors = [];
   const outFixes  = [];
@@ -409,10 +429,24 @@ app.post("/api/grade", async (req, res) => {
     if (!Array.isArray(student.steps)) student.steps = [];
     student.problem_plain = String(student.problem_plain || "").trim();
     student.conclusion    = String(student.conclusion || "").trim();
-
+    const goldenMin = {
+      method: solved.method,
+      solution_summary: String(solved.solution_summary || "").slice(0, 300),
+      main_steps: (solved.main_steps || []).slice(0, 12).map(s => String(s).slice(0, 180)),
+    };
+    
+    const studentMin = {
+      steps: (student.steps || []).slice(0, 30).map(st => ({
+        index: st.index,
+        text: String(st.text || "").slice(0, 200),
+        math: String(st.math || "").slice(0, 160),
+      })),
+      conclusion: String(student.conclusion || "").slice(0, 200),
+    };
+    
     // 4) COMPARE: so sánh theo bước + so khớp kết luận
     const r4 = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       temperature: 0.0,
       response_format: { type: "json_object" },
       max_tokens: 2500,
@@ -420,16 +454,52 @@ app.post("/api/grade", async (req, res) => {
         { role: "system", content: SYSTEM_COMPARE },
         { role: "user", content:
 `golden:
-${JSON.stringify({ method: solved.method, solution_summary: solved.solution_summary, main_steps: solved.main_steps }, null, 2)}
+${JSON.stringify(goldenMin)}
 
 student:
-${JSON.stringify({ steps: student.steps, conclusion: student.conclusion }, null, 2)}`
+${JSON.stringify(studentMin)}`
         }
       ]
     });
-    let compared = {};
-    try { compared = JSON.parse(r4.choices?.[0]?.message?.content || "{}"); }
-    catch { return res.json({ error: "BAD_JSON_COMPARE", raw: r4.choices?.[0]?.message?.content }); }
+    let comparedRaw = r4.choices?.[0]?.message?.content || "{}";
+    let compared = relaxedJsonParse(comparedRaw);
+
+    // Retry 1 lần nếu vẫn hỏng JSON
+    if (!compared) {
+      const r4b = await openai.chat.completions.create({
+        model: "gpt-4o",
+        temperature: 0.0,
+        response_format: { type: "json_object" },
+        max_tokens: 1800,
+        messages: [
+          { role: "system", content: SYSTEM_COMPARE + "\n\nCHỈ TRẢ JSON 1 DÒNG, KHÔNG MARKDOWN, KHÔNG GIẢI THÍCH." },
+          { role: "user", content:
+    `golden:
+    ${JSON.stringify(goldenMin)}
+
+    student:
+    ${JSON.stringify(studentMin)}`
+          }
+        ]
+      });
+      comparedRaw = r4b.choices?.[0]?.message?.content || "{}";
+      compared = relaxedJsonParse(comparedRaw);
+    }
+
+    // Fallback mềm: đừng làm hỏng cả response
+    if (!compared) {
+      console.error("COMPARE JSON failed. raw=", comparedRaw?.slice(0, 400));
+      compared = {
+        verdict: "partial",
+        reason: "parser_fallback",
+        steps_alignment: [],
+        conclusion_match: "unclear",
+        differences: [],
+        step_errors: [],
+        fix_suggestions: []
+      };
+    }
+
     compared.verdict ||= "partial";
     compared.reason  ||= "";
     if (!Array.isArray(compared.steps_alignment)) compared.steps_alignment = [];
@@ -466,7 +536,7 @@ ${JSON.stringify({ steps: student.steps, conclusion: student.conclusion }, null,
       // LỖI & GỢI Ý (map từ bảng so sánh => luôn khớp 100%)
       step_errors: final_step_errors,
       fix_suggestions: final_fix_suggestions,
-
+      detected_method: solved.method, 
       // Khối mới để hiển thị nếu muốn:
       golden: {
         problem_plain: parsed.problem_plain,
@@ -511,7 +581,7 @@ ${JSON.stringify({ steps: student.steps, conclusion: student.conclusion }, null,
       });
 
       const rawP = rP.choices?.[0]?.message?.content || "{}";
-      practice = JSON.parse(rawP);
+      practice = relaxedJsonParse(rawP) || { items: [] };
     } catch (e) {
       console.error("practice gen error:", e?.message);
       practice = { items: [] };
