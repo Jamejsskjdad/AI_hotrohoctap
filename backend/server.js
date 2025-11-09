@@ -451,7 +451,7 @@ app.post("/api/grade", async (req, res) => {
       response_format: { type: "json_object" },
       max_tokens: 2500,
       messages: [
-        { role: "system", content: SYSTEM_COMPARE },
+        { role: "system", content: SYSTEM_COMPARE + "\n\nNgôn ngữ đầu ra: CHỈ tiếng Việt, không dùng tiếng Anh." },
         { role: "user", content:
 `golden:
 ${JSON.stringify(goldenMin)}
@@ -472,7 +472,7 @@ ${JSON.stringify(studentMin)}`
         response_format: { type: "json_object" },
         max_tokens: 1800,
         messages: [
-          { role: "system", content: SYSTEM_COMPARE + "\n\nCHỈ TRẢ JSON 1 DÒNG, KHÔNG MARKDOWN, KHÔNG GIẢI THÍCH." },
+          { role: "system", content: SYSTEM_COMPARE + "\n\nCHỈ TRẢ JSON 1 DÒNG, KHÔNG MARKDOWN, KHÔNG GIẢI THÍCH. Ngôn ngữ: **chỉ tiếng Việt**." },
           { role: "user", content:
     `golden:
     ${JSON.stringify(goldenMin)}

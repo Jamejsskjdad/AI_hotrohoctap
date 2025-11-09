@@ -212,7 +212,10 @@ exports.SYSTEM_COMPARE = `
 Đầu vào:
 - golden: { method, solution_summary, main_steps } từ lời giải của máy
 - student: { steps:[{index,text,math}], conclusion }
-
+YÊU CẦU NGÔN NGỮ (BẮT BUỘC):
+- TẤT CẢ các chuỗi văn bản đầu ra (reason, differences, steps_alignment.what, steps_alignment.fix,
+  step_errors[*].what, step_errors[*].fix, fix_suggestions[*].explain) PHẢI bằng **tiếng Việt chuẩn**.
+- Tuyệt đối KHÔNG dùng tiếng Anh hay trộn ngôn ngữ.
 Nhiệm vụ:
 1) Căn chỉnh từng bước: xem mỗi bước HS là đúng/sai/chưa rõ so với bước tương ứng của máy.
 2) So khớp kết luận nghiệm (match|mismatch|unclear).

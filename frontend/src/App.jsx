@@ -93,13 +93,13 @@ export default function App() {
       <div className="card">
         <div className="header">
           <h1><i className="fa-solid fa-brain" /> Ứng dụng AI Hỗ Trợ Nhận Diện và Sửa Lỗi</h1>
-          <p>Hệ phương trình bậc nhất ba ẩn - Đề tài KHKT</p>
+          <p>Hệ phương trình bậc nhất ba ẩn</p>
         </div>
 
         <div className="upload" onClick={() => fileRef.current?.click()}>
            <i className={`fa-solid ${previews.length ? "fa-check-circle" : "fa-cloud-upload-alt"} icon`} />
            <div className="label">Tải lên ảnh lời giải của học sinh</div>
-           <p className="hint">Chọn **nhiều** ảnh (JPG/PNG)</p>
+           <p className="hint">Chọn nhiều ảnh (JPG/PNG)</p>
            <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={handleFiles} />
            {previews.length > 0 && previews.map((src, i) => (
              <img key={i} src={src} className="preview" />
@@ -117,7 +117,7 @@ export default function App() {
 
         {rawText && (
           <details className="box">
-            <summary>Văn bản OCR</summary>
+            <summary>Bài làm của học sinh sau khi chuyển đổi</summary>
             <pre className="pre">{rawText}</pre>
           </details>
         )}       
@@ -205,7 +205,7 @@ export default function App() {
                 {Array.isArray(result?.practice_list) && result.practice_list.length > 0 && (
                   <div className="subbox">
                     <h3 className="title">
-                      <i className="fa-solid fa-list-check" /> Bài tập gợi ý (luyện tiếp)
+                      <i className="fa-solid fa-list-check" /> Bài tập gợi ý
                     </h3>
                     <div style={{ display: "grid", gap: 12 }}>
                       {result.practice_list.map((p) => (
@@ -225,12 +225,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Bản LaTeX đầy đủ */}
-                {fullSolution.length > 0 ? (
-                  <div className="subbox" style={{ marginTop: 12 }}>
-                    <MathBlock latex={fullSolution} />
-                  </div>
-                ) : null}
+               
               </div>
             </div>
           </section>
