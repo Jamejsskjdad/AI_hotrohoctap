@@ -239,3 +239,28 @@ TRẢ JSON DUY NHẤT:
   "fix_suggestions": [{"step":2,"explain":"Nhân (2) với -1 rồi cộng (1)","latex":"\\\\begin{align*} ... \\\\end{align*}"}]
 }
 `;
+// === GỢI Ý BÀI TẬP TƯƠNG TỰ (CHỈ ĐỀ BÀI) ===
+exports.SYSTEM_PRACTICE = `
+Bạn tạo **bộ bài tập luyện** cho hệ phương trình bậc nhất 3 ẩn (x,y,z) THPT, dựa trên ngữ cảnh sau:
+
+- method_hint: "gauss" | "elimination" | "substitution" | "matrix" | "unknown"
+- solution_type_hint: "unique" | "none" | "infinite" | "unknown"
+- error_codes: mảng mã lỗi ngắn (ví dụ: ["Sai biến đổi","Thiếu bước","Nhầm dấu"...])
+- diversity: true (hãy đa dạng hóa mức độ khó và dạng nghiệm)
+- count: số bài cần sinh (3–5)
+
+YÊU CẦU:
+- Trả **DUY NHẤT** JSON hợp lệ: {"items":[{"latex":"\\\\begin{cases} ... \\\\end{cases}","tags":["gauss","unique","easy"]}, ...]}
+- Mỗi "latex" là **một hệ 3 phương trình** ở dạng \\begin{cases}...\\end{cases}, biến chuẩn x,y,z.
+- **Không** kèm lời giải/đáp số/nhận xét.
+- "tags" là mảng 2–4 nhãn ngắn gợi ý: gồm phương pháp chính, dạng nghiệm (unique|none|infinite) và mức độ (easy|medium|hard).
+- Nếu method_hint="unknown" vẫn phải sinh bài nhưng nên trải đều phương pháp.
+- Đảm bảo **đa dạng độ khó** và, nếu diversity=true, **đa dạng dạng nghiệm** (ít nhất 2 dạng khác nhau nếu count>=4).
+- Hệ số nên vừa tay THPT; có thể có phân số nhưng tránh quá rối.
+
+CHỈ TRẢ JSON:
+{"items":[
+  {"latex":"\\\\begin{cases} ... \\\\end{cases}","tags":["elimination","unique","medium"]},
+  {"latex":"\\\\begin{cases} ... \\\\end{cases}","tags":["substitution","infinite","easy"]}
+]}
+`;

@@ -201,6 +201,29 @@ export default function App() {
                     </ul>
                   </div>
                 )}
+                {/* Bài tập gợi ý (chỉ đề) */}
+                {Array.isArray(result?.practice_list) && result.practice_list.length > 0 && (
+                  <div className="subbox">
+                    <h3 className="title">
+                      <i className="fa-solid fa-list-check" /> Bài tập gợi ý (luyện tiếp)
+                    </h3>
+                    <div style={{ display: "grid", gap: 12 }}>
+                      {result.practice_list.map((p) => (
+                        <div key={p.index} className="box" style={{ background: "#f9f9ff" }}>
+                          <div style={{ fontWeight: 600, marginBottom: 6 }}>Bài {p.index}</div>
+                          <MathBlock latex={safeStr(p.latex)} />
+                          {Array.isArray(p.tags) && p.tags.length > 0 && (
+                            <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
+                              {p.tags.map((t, i) => (
+                                <span key={i} style={{ marginRight: 8 }}>#{t}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Bản LaTeX đầy đủ */}
                 {fullSolution.length > 0 ? (

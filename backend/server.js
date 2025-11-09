@@ -16,7 +16,7 @@ const express = require("express");
 const cors = require("cors");
 const { OpenAI } = require("openai");
 const { SYSTEM_ANALYZE, USER_SCHEMA, SYSTEM_OCR,
-        SYSTEM_PARSE, SYSTEM_SOLVE_STRICT, SYSTEM_SEGMENT_STUDENT, SYSTEM_COMPARE } = require("./prompt");
+  SYSTEM_PARSE, SYSTEM_SOLVE_STRICT, SYSTEM_SEGMENT_STUDENT, SYSTEM_COMPARE, SYSTEM_PRACTICE } = require("./prompt");
 const multer = require("multer");
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -336,6 +336,15 @@ app.post("/api/report", (req, res) => {
   // TODO: nối Google Sheets nếu muốn; hiện tại trả 204 cho nhanh
   return res.status(204).end();
 });
+function classifySolutionType(summary) {
+  const s = String(summary || "").toLowerCase();
+  if (!s) return "unknown";
+  if (s.includes("vô nghiệm") || s.includes("không có nghiệm")) return "none";
+  if (s.includes("vô số nghiệm") || s.includes("vô hạn nghiệm")) return "infinite";
+  if (s.includes("x =") || s.includes("y =") || s.includes("z =")) return "unique";
+  return "unknown";
+}
+
 app.post("/api/grade", async (req, res) => {
   try {
     const { raw_text } = req.body || {};
@@ -476,7 +485,48 @@ ${JSON.stringify({ steps: student.steps, conclusion: student.conclusion }, null,
         differences: compared.differences
       }
     };
+    // 4.5) PRACTICE: sinh 3–5 bài tập gợi ý (chỉ đề)
+    const errorCodes = (final_step_errors || []).map(e => String(e?.code || "").trim()).filter(Boolean).slice(0, 6);
+    const methodHint  = solved.method || "unknown";
+    const solTypeHint = classifySolutionType(solved.solution_summary); // unique|none|infinite|unknown
 
+    let practice = { items: [] };
+    try {
+      const rP = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.6,                // đa dạng hơn một chút
+        response_format: { type: "json_object" },
+        max_tokens: 2000,
+        messages: [
+          { role: "system", content: SYSTEM_PRACTICE },
+          { role: "user", content: JSON.stringify({
+              method_hint: methodHint,
+              solution_type_hint: solTypeHint,
+              error_codes: errorCodes,
+              diversity: true,
+              count: 4   // 3–5: chọn mặc định 4
+            })
+          }
+        ]
+      });
+
+      const rawP = rP.choices?.[0]?.message?.content || "{}";
+      practice = JSON.parse(rawP);
+    } catch (e) {
+      console.error("practice gen error:", e?.message);
+      practice = { items: [] };
+    }
+
+    // sanitize LaTeX cho từng đề
+    let practice_list = [];
+    if (Array.isArray(practice.items)) {
+      practice_list = practice.items.map((it, idx) => ({
+        index: idx + 1,
+        latex: normalizeLatex(String(it?.latex || "")),
+        tags: Array.isArray(it?.tags) ? it.tags.slice(0,4) : []
+      })).filter(p => p.latex.includes("\\begin{cases}") && p.latex.includes("\\end{cases}"));
+    }
+    payload.practice_list = practice_list;
     return res.json(payload);
   } catch (e) {
     console.error("grade error:", e);
