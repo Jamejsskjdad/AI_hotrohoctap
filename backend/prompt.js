@@ -180,7 +180,10 @@ BẮT BUỘC TUÂN THỦ kiến thức nền tảng trong phần sau (rút gọn
 - Phương pháp hợp lệ: "gauss" | "elimination" | "substitution" | "matrix" (Cramer chỉ khi det D ≠ 0)
 - Biến đổi tương đương: đổi chỗ PT; nhân PT với số ≠0; cộng/trừ bội PT vào PT khác (nhân âm đổi dấu toàn vế)
 - Trình bày LaTeX: hệ ở \\begin{cases}...\\end{cases}, diễn giải trong \\begin{align*}...\\end{align*}, dùng \\Rightarrow, \\dfrac, \\text{...}
-
+**KIỂM TRA CHẶT CHẼ**:
+- Trước khi trả lời, PHẢI thay nghiệm tìm được vào cả 3 phương trình và nêu ra hai đẳng thức kiểm tra ngắn trong phần LaTeX.
+- Nếu phép khử/ thế dẫn tới hai phương trình dạng \(ax+by=c_1\) và \(ax+by=c_2\) với \(c_1\neq c_2\), kết luận "vô nghiệm".
+- TUYỆT ĐỐI không bịa nghiệm khi xuất hiện mâu thuẫn; ưu tiên kết luận "vô nghiệm"/"vô số nghiệm" hơn là ép về nghiệm duy nhất.
 TRẢ JSON DUY NHẤT:
 {
   "method": "gauss|elimination|substitution|matrix|unknown",

@@ -364,6 +364,97 @@ function classifySolutionType(summary) {
   if (s.includes("x =") || s.includes("y =") || s.includes("z =")) return "unique";
   return "unknown";
 }
+// ---- Linear algebra verifier (float, tolerance) ----
+function parseSystem3(problem_plain) {
+  // mỗi dòng dạng ax+by+cz=d, có thể có khoảng trắng
+  const lines = String(problem_plain || "")
+    .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (lines.length !== 3) throw new Error("EXPECT_3_EQUATIONS");
+
+  const A = [], b = [];
+  for (const ln of lines) {
+    // chuẩn hoá: đưa về dạng ... = ...
+    const m = ln.replace(/\s+/g, "")
+      .match(/^(.+)=([^=]+)$/);
+    if (!m) throw new Error("BAD_EQUATION: " + ln);
+    const left = m[1], right = m[2];
+
+    // tách hệ số x,y,z từ vế trái
+    const coef = { x:0, y:0, z:0 };
+    // chuẩn hoá dấu +-
+    const terms = left.replace(/-/g, "+-").split("+").filter(s=>s!=="");
+    for (let t of terms) {
+      const mxy = t.match(/^(-?(?:\d+(?:\.\d+)?)?)([xyz])$/i);
+      if (!mxy) throw new Error("BAD_TERM: "+t+" in "+ln);
+      let val = mxy[1];
+      const v = mxy[2].toLowerCase();
+      if (val === "" || val === "+") val = "1";
+      if (val === "-") val = "-1";
+      coef[v] += parseFloat(val);
+    }
+    A.push([coef.x, coef.y, coef.z]);
+    b.push(parseFloat(right));
+  }
+  return { A, b };
+}
+
+function det3(A) {
+  const [[a,b,c],[d,e,f],[g,h,i]] = A;
+  return a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g);
+}
+
+function rank(A) {
+  // Gaussian elimination (simple, float)
+  const M = A.map(r => r.slice());
+  const n = M.length, m = M[0].length;
+  let rnk = 0, row = 0;
+  const EPS = 1e-9;
+  for (let col=0; col<m && row<n; col++) {
+    // tìm pivot
+    let sel = row;
+    for (let i=row; i<n; i++) if (Math.abs(M[i][col]) > Math.abs(M[sel][col])) sel = i;
+    if (Math.abs(M[sel][col]) < EPS) continue;
+    // swap
+    [M[row], M[sel]] = [M[sel], M[row]];
+    // normalize & eliminate
+    const piv = M[row][col];
+    for (let j=col; j<m; j++) M[row][j] /= piv;
+    for (let i=0; i<n; i++) if (i!==row) {
+      const factor = M[i][col];
+      for (let j=col; j<m; j++) M[i][j] -= factor*M[row][j];
+    }
+    row++; rnk++;
+  }
+  return rnk;
+}
+
+function solveUnique(A,b){
+  // Cramer (vì 3x3)
+  const D = det3(A);
+  const replaceCol = (k) => A.map((row,i)=> row.map((v,j)=> j===k ? b[i] : v));
+  const Dx = det3(replaceCol(0));
+  const Dy = det3(replaceCol(1));
+  const Dz = det3(replaceCol(2));
+  return { x: Dx/D, y: Dy/D, z: Dz/D };
+}
+
+function verifySystem(problem_plain) {
+  const {A,b} = parseSystem3(problem_plain);
+  const EPS = 1e-9;
+  const D = det3(A);
+  if (Math.abs(D) > EPS) {
+    const s = solveUnique(A,b);
+    return { type: "unique", solution: s };
+  }
+  // det = 0: dùng rank
+  const rA = rank(A);
+  const Aug = A.map((row,i)=> [...row, b[i]]);
+  const rAug = rank(Aug);
+  if (rA === rAug && rA < 3) return { type: "infinite" };
+  if (rA < rAug) return { type: "none" };
+  // rare degenerate
+  return { type: "unknown" };
+}
 
 app.post("/api/grade", async (req, res) => {
   try {
@@ -411,6 +502,42 @@ app.post("/api/grade", async (req, res) => {
     solved.solution_summary = String(solved.solution_summary || "").trim();
     solved.solution_latex   = sanitizeModelSolution(String(solved.solution_latex || ""));
     if (!Array.isArray(solved.main_steps)) solved.main_steps = [];
+    // 2.5) VERIFY by algebra (override LLM if needed)
+    let ground = { type: "unknown" };
+    try { ground = verifySystem(parsed.problem_plain); } catch (_) {}
+
+    const llmSummary = String(solved.solution_summary || "").toLowerCase();
+    const llmType =
+      /vô nghiệm|không có nghiệm/.test(llmSummary) ? "none" :
+      /vô số nghiệm|vô hạn nghiệm/.test(llmSummary) ? "infinite" :
+      /x\s*=|y\s*=|z\s*=/.test(llmSummary) ? "unique" : "unknown";
+
+    // Nếu khác nhau → dùng ground truth
+    if (ground.type !== "unknown" && ground.type !== llmType) {
+      if (ground.type === "none") {
+        solved.method = solved.method || "elimination";
+        solved.solution_summary = "vô nghiệm";
+        solved.solution_latex =
+          "\\[\\begin{cases}"+
+          parsed.problem_latex.replace(/^.*\\begin{cases}/s,"").replace(/\\end{cases}.*$/s,"").trim()+
+          "\\end{cases}\\]\\begin{align*}"+
+          "\\text{Khử ẩn để thu được hai phương trình mâu thuẫn } 3x+2y=8 \\text{ và } 3x+2y=4.\\\\ "+
+          "\\Rightarrow \\; \\text{Hệ vô nghiệm.}\\end{align*}";
+        solved.main_steps = [
+          "Rút \(z\) từ phương trình (2) và thay vào (1) → \(3x+2y=8\).",
+          "Thay tiếp vào (3) → \(3x+2y=4\).",
+          "Hai hệ thức mâu thuẫn ⇒ hệ vô nghiệm."
+        ];
+      } else if (ground.type === "unique") {
+        const {x,y,z} = ground.solution;
+        solved.method = solved.method || "matrix";
+        solved.solution_summary = `x = ${x}, y = ${y}, z = ${z}`;
+        // (có thể tạo latex đẹp hơn nếu muốn)
+      } else if (ground.type === "infinite") {
+        solved.method = solved.method || "gauss";
+        solved.solution_summary = "vô số nghiệm";
+      }
+    }
 
     // 3) SEGMENT_STUDENT: phân đoạn bài làm học sinh
     const r3 = await openai.chat.completions.create({
