@@ -241,6 +241,79 @@ function sanitizeModelSolution(s) {
   t = normalizeLatex(t);
   return t;
 }
+// === Deterministic 3x3 linear solver with Fractions ===
+class Frac {
+  constructor(n, d = 1) {
+    if (d === 0) throw new Error("Zero denominator");
+    const g = (x,y)=>y?g(y,x%y):Math.abs(x);
+    const s = (n<0) ^ (d<0) ? -1 : 1;
+    n = Math.abs(n); d = Math.abs(d);
+    const gg = g(n,d) || 1;
+    this.n = s*(n/gg); this.d = d/gg;
+  }
+  static from(x){ if (x instanceof Frac) return x;
+    if (Number.isInteger(x)) return new Frac(x,1);
+    // parse "p/q" or decimal
+    if (typeof x === "string" && x.includes("/")){
+      const [p,q] = x.split("/").map(Number); return new Frac(p,q);
+    }
+    // decimal -> fraction
+    const s = String(x), k = s.split(".")[1]?.length || 0;
+    return new Frac(Math.round(Number(x)*10**k), 10**k);
+  }
+  add(b){ b=Frac.from(b); return new Frac(this.n*b.d + b.n*this.d, this.d*b.d); }
+  sub(b){ b=Frac.from(b); return new Frac(this.n*b.d - b.n*this.d, this.d*b.d); }
+  mul(b){ b=Frac.from(b); return new Frac(this.n*b.n, this.d*b.d); }
+  div(b){ b=Frac.from(b); return new Frac(this.n*b.d, this.d*b.n); }
+  isZero(){ return this.n===0; }
+  eq(b){ b=Frac.from(b); return this.n===b.n && this.d===b.d; }
+  toString(){ return this.d===1 ? String(this.n) : `${this.n}/${this.d}`; }
+  toNumber(){ return this.n/this.d; }
+}
+
+// Solve Ax=b. Return {type:"unique"|"none"|"infinite", x:[Frac,Frac,Frac]|null}
+function solve3(A,b){
+  // deep copy in fraction
+  const M = A.map(r => r.map(Frac.from));
+  const B = b.map(Frac.from);
+  // Gauss elimination
+  let rankA = 0, rankAb = 0, R=3, C=3, row = 0;
+  for (let col=0; col<C && row<R; col++){
+    // pivot
+    let p = row; while (p<R && M[p][col].isZero()) p++;
+    if (p===R) continue;
+    [M[row], M[p]] = [M[p], M[row]];
+    [B[row], B[p]] = [B[p], B[row]];
+    // normalize & eliminate
+    const piv = M[row][col];
+    for (let j=col; j<C; j++) M[row][j] = M[row][j].div(piv);
+    B[row] = B[row].div(piv);
+    for (let i=0; i<R; i++){
+      if (i===row) continue;
+      const f = M[i][col];
+      if (f.isZero()) continue;
+      for (let j=col; j<C; j++) M[i][j] = M[i][j].sub(f.mul(M[row][j]));
+      B[i] = B[i].sub(f.mul(B[row]));
+    }
+    row++; rankA++;
+  }
+  // rank of augmented
+  rankAb = rankA;
+  for (let i=0;i<R;i++){
+    const zeroRow = M[i].every(x=>x.isZero());
+    if (zeroRow && !B[i].isZero()) { rankAb = rankA + 1; break; }
+  }
+  if (rankAb > rankA) return { type:"none", x:null };
+
+  if (rankA < 3) return { type:"infinite", x:null };
+
+  // back-substitution now gives identity; B is the solution
+  return { type:"unique", x:[B[0],B[1],B[2]] };
+}
+
+// Helper to latex a fraction vector:
+function vecToLatex(fr){ return `x = ${fr[0]}, y = ${fr[1]}, z = ${fr[2]}`; }
+
 // =============== OCR bằng model vision (nhiều ảnh) ===============
 app.post("/api/ocr", upload.array("files", 12), async (req, res) => {
   try {
@@ -455,6 +528,17 @@ function verifySystem(problem_plain) {
   // rare degenerate
   return { type: "unknown" };
 }
+function parseXYZFromText(t){
+  if (!t) return null;
+  const s = t.replace(/\s+/g,'');
+  // x=...,y=...,z=... hoặc (x,y,z)=(..,..,..)s
+  const m1 = s.match(/x=([\-0-9/\.]+).*?y=([\-0-9/\.]+).*?z=([\-0-9/\.]+)/i);
+  if (m1) return [m1[1], m1[2], m1[3]];
+  const m2 = s.match(/\(x,y,z\)=\(([\-0-9/\.]+),([\-0-9/\.]+),([\-0-9/\.]+)\)/i);
+  if (m2) return [m2[1], m2[2], m2[3]];
+  return null;
+}
+function eqFracStr(a,b){ try{ return Frac.from(a).eq(Frac.from(b)); }catch(_){ return false; } }
 
 app.post("/api/grade", async (req, res) => {
   try {
@@ -482,6 +566,49 @@ app.post("/api/grade", async (req, res) => {
     if (!parsed.problem_plain) {
       return res.status(400).json({ error: "NO_PROBLEM_DETECTED", parsed });
     }
+  // Sau khi có parsed.problem_plain:
+  const eqs = parsed.problem_plain.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  // Parse "ax+by+cz=d" -> [a,b,c], d
+  function parseEq(line){
+    // very simple: move all to left, parse coefficients of x,y,z and const.
+    // Vì bạn đang OCR chuẩn, format ax+by+cz=d là đủ chắc.
+    const [L,R] = line.split("=");
+    const S = v => v.replace(/\s+/g,"");
+    const left = S(L), right = Frac.from(S(R));
+    const coef = (varr) => {
+      const m = left.match(new RegExp(`([+-]?\\d*(?:/\\d+)?)${varr}`,'g'))||[];
+      return m.map(t=>{
+        const k = t.replace(varr,"");
+        return k===""||k==="+"
+          ? Frac.from(1) : (k==="-" ? Frac.from(-1) : Frac.from(k));
+      }).reduce((a,c)=>a.add(c), Frac.from(0));
+    };
+    const ax = coef("x"), by = coef("y"), cz = coef("z");
+    // constant term on left (move to right)
+    const constLeft = left
+      .replace(/[+-]?\d*(?:\/\d+)?x/g,"")
+      .replace(/[+-]?\d*(?:\/\d+)?y/g,"")
+      .replace(/[+-]?\d*(?:\/\d+)?z/g,"");
+      let cL = Frac.from(0);
+      constLeft.replace(/([+\-]?\d+(?:\/\d+)?)/g, (m) => { cL = cL.add(Frac.from(m)); return m; });
+    return { abc:[ax,by,cz], d: right.sub(cL) };
+  }
+
+  const rows = eqs.map(parseEq);
+  const sol = solve3(rows.map(r=>r.abc.map(f=>f.toNumber?f:Frac.from(f))), rows.map(r=>r.d));
+  // Ground truth từ solver phân số
+  const ground = (()=>{
+    if (sol.type === "unique") {
+      return {
+        type: "unique",
+        exact: sol.x.map(fr => fr.toString()),               // ["2","0","2"] dạng phân số
+        summary: vecToLatex(sol.x)                           // "x = 2, y = 0, z = 2"
+      };
+    }
+    if (sol.type === "none")     return { type:"none",     exact:null, summary:"vô nghiệm" };
+    if (sol.type === "infinite") return { type:"infinite", exact:null, summary:"vô số nghiệm" };
+    return { type:"unknown", exact:null, summary:"unknown" };
+  })();
 
     // 2) SOLVE (STRICT): máy tự giải theo kiến thức nền tảng
     const r2 = await openai.chat.completions.create({
@@ -491,7 +618,13 @@ app.post("/api/grade", async (req, res) => {
       max_tokens: 4000,
       messages: [
         { role: "system", content: SYSTEM_SOLVE_STRICT },
-        { role: "user", content: `problem_plain:\n${parsed.problem_plain}` }
+        { role: "user", content: JSON.stringify({
+            problem_plain: parsed.problem_plain,
+            // Ground truth ép model phải tuân theo
+            solution_type: ground.type,              // "unique" | "none" | "infinite" | "unknown"
+            solution_exact: ground.exact             // ["2","0","2"] hoặc null
+          })
+        }
       ]
     });
     let solved = {};
@@ -503,8 +636,13 @@ app.post("/api/grade", async (req, res) => {
     solved.solution_latex   = sanitizeModelSolution(String(solved.solution_latex || ""));
     if (!Array.isArray(solved.main_steps)) solved.main_steps = [];
     // 2.5) VERIFY by algebra (override LLM if needed)
-    let ground = { type: "unknown" };
-    try { ground = verifySystem(parsed.problem_plain); } catch (_) {}
+    if (ground.type === "unique") {
+         solved.solution_summary = ground.summary;
+       } else if (ground.type === "none") {
+         solved.solution_summary = "vô nghiệm";
+       } else if (ground.type === "infinite") {
+         solved.solution_summary = "vô số nghiệm";
+       }
 
     const llmSummary = String(solved.solution_summary || "").toLowerCase();
     const llmType =
@@ -578,13 +716,14 @@ app.post("/api/grade", async (req, res) => {
       response_format: { type: "json_object" },
       max_tokens: 2500,
       messages: [
-        { role: "system", content: SYSTEM_COMPARE + "\n\nNgôn ngữ đầu ra: CHỈ tiếng Việt, không dùng tiếng Anh." },
-        { role: "user", content:
-`golden:
-${JSON.stringify(goldenMin)}
-
-student:
-${JSON.stringify(studentMin)}`
+        { role: "system", content: SYSTEM_COMPARE + "\n\nNgôn ngữ đầu ra: CHỈ tiếng Việt. ƯU TIÊN ground truth khi chấm." },
+        { role: "user", content: JSON.stringify({
+            golden:  goldenMin,
+            student: studentMin,
+            // Ground truth truyền vào để model căn cứ
+            solution_type: ground.type,
+            solution_exact: ground.exact
+          })
         }
       ]
     });
@@ -599,13 +738,13 @@ ${JSON.stringify(studentMin)}`
         response_format: { type: "json_object" },
         max_tokens: 1800,
         messages: [
-          { role: "system", content: SYSTEM_COMPARE + "\n\nCHỈ TRẢ JSON 1 DÒNG, KHÔNG MARKDOWN, KHÔNG GIẢI THÍCH. Ngôn ngữ: **chỉ tiếng Việt**." },
-          { role: "user", content:
-    `golden:
-    ${JSON.stringify(goldenMin)}
-
-    student:
-    ${JSON.stringify(studentMin)}`
+          { role: "system", content: SYSTEM_COMPARE + "\n\nCHỈ TRẢ JSON 1 DÒNG, KHÔNG MARKDOWN, KHÔNG GIẢI THÍCH. Ngôn ngữ: **chỉ tiếng Việt**. ƯU TIÊN ground truth khi chấm." },
+          { role: "user", content: JSON.stringify({
+              golden:  goldenMin,
+              student: studentMin,
+              solution_type: ground.type,
+              solution_exact: ground.exact
+            })
           }
         ]
       });
@@ -650,12 +789,30 @@ ${JSON.stringify(studentMin)}`
       unknown: "Không xác định"
     };
     const method_vi = methodMap[solved.method] || solved.method;
+    // Hard-check kết luận theo ground truth
+    let hardConclusion = "unclear";
+    const stuC = student.conclusion || "";
+    if (ground.type === "none") {
+      if (/vô\s*nghiệm/i.test(stuC)) hardConclusion = "match"; else hardConclusion = "mismatch";
+    } else if (ground.type === "infinite") {
+      if (/vô\s*(số|hạn)\s*nghiệm/i.test(stuC)) hardConclusion = "match"; else hardConclusion = "mismatch";
+    } else if (ground.type === "unique") {
+      const v = parseXYZFromText(stuC);
+      if (v) {
+        hardConclusion = (eqFracStr(v[0], ground.exact[0]) && eqFracStr(v[1], ground.exact[1]) && eqFracStr(v[2], ground.exact[2]))
+          ? "match" : "mismatch";
+      }
+    }
+    // ghi đè nếu model đánh giá khác
+    if (hardConclusion !== "unclear") {
+      compared.conclusion_match = hardConclusion;
+    }
 
     const payload = {
       normalized_problem: parsed.problem_latex,
       model_solution_latex: solved.solution_latex,
       solution_card: {
-        solution_summary: solved.solution_summary || "",
+        solution_summary: ground.summary || solved.solution_summary || "",
         method_used: method_vi,
         main_steps: solved.main_steps || []
       },
