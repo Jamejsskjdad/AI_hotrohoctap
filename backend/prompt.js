@@ -199,7 +199,9 @@ Bạn nhận "student_plain" (bài làm OCR của học sinh). Hãy PHÂN ĐOẠ
 
 - problem_plain: 3 phương trình đầu bài (nếu HS có chép lại); rỗng nếu không rõ.
 - steps: mảng các bước. Mỗi bước:
-  {"index":1,"text":"nội dung gốc 1 dòng ngắn","math":"ax+by+cz=... (nếu có, có thể rỗng)"}
+  {"index":1,"text":"nội dung gốc 1 dòng ngắn","math":"ax+by+cz=d (nếu có). Tuyệt đối không ghi 'z=' hay 'x='; nếu bước chỉ là lời giải thích thì để math=\"\"."}
+  - Nếu một dòng chứa nhiều phương trình, tách thành nhiều bước liền kề.
+  - Không tự sửa nội dung; chỉ chuẩn hoá lại dấu và khoảng trắng.
 - conclusion: câu kết luận nghiệm của HS (nếu có, rỗng nếu không rõ).
 
 JSON DUY NHẤT:

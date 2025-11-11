@@ -510,23 +510,58 @@ function solveUnique(A,b){
   const Dz = det3(replaceCol(2));
   return { x: Dx/D, y: Dy/D, z: Dz/D };
 }
+// ---- Deterministic step checker: kiểm tra 1 phương trình có là tổ hợp tuyến tính của các PT trước đó không
 
-function verifySystem(problem_plain) {
-  const {A,b} = parseSystem3(problem_plain);
-  const EPS = 1e-9;
-  const D = det3(A);
-  if (Math.abs(D) > EPS) {
-    const s = solveUnique(A,b);
-    return { type: "unique", solution: s };
+function parseLinearEq(line) {
+  // Chuẩn "ax+by+cz=d" (chấp nhận khoảng trắng, số thập phân/phân số, dấu +/-)
+  const s = String(line || '').replace(/\s+/g,'');
+  const m = s.match(/^(.+)=([^=]+)$/);
+  if (!m) return null;
+  const L = m[1], R = m[2];
+  const coef = { x:0, y:0, z:0, c:0 };
+
+  // Tách vế trái theo +/-
+  const parts = L.replace(/-/g, '+-').split('+').filter(Boolean);
+  for (const p of parts) {
+    const t = p.match(/^([\-]?\d*(?:\/\d+)?)?([xyz])$/i);
+    if (t) {
+      let k = t[1];
+      if (k === '' || k === '+') k = '1';
+      if (k === '-') k = '-1';
+      const v = t[2].toLowerCase();
+      coef[v] += Frac.from(k).toNumber();
+    } else {
+      // hằng số bên trái
+      coef.c += Frac.from(p).toNumber();
+    }
   }
-  // det = 0: dùng rank
-  const rA = rank(A);
-  const Aug = A.map((row,i)=> [...row, b[i]]);
-  const rAug = rank(Aug);
-  if (rA === rAug && rA < 3) return { type: "infinite" };
-  if (rA < rAug) return { type: "none" };
-  // rare degenerate
-  return { type: "unknown" };
+  const d = Frac.from(R).sub(Frac.from(coef.c)).toNumber();
+  return { a:coef.x, b:coef.y, c:coef.z, d }; // biểu diễn chuẩn
+}
+
+// Giải alpha, beta sao cho: alpha*E1 + beta*E2 = E (theo 4 thành phần a,b,c,d)
+function combo2(E1, E2, E) {
+  // Dựa vào hệ {a,b}, rồi kiểm tra {c,d}
+  const A00 = E1.a, A01 = E2.a, A10 = E1.b, A11 = E2.b;
+  const B0 = E.a, B1 = E.b;
+  const det = A00*A11 - A01*A10;
+  if (Math.abs(det) < 1e-10) return null;
+  const alpha = (B0*A11 - B1*A01) / det;
+  const beta  = (A00*B1 - A10*B0) / det;
+  const c = alpha*E1.c + beta*E2.c;
+  const d = alpha*E1.d + beta*E2.d;
+  if (Math.abs(c - E.c) < 1e-7 && Math.abs(d - E.d) < 1e-7) return { alpha, beta };
+  return null;
+}
+
+function isLinearComboOf(E, bank) {
+  // thử tất cả cặp trong "bank" (đủ cho các bước khử/cộng đại số kiểu THPT)
+  for (let i = 0; i < bank.length; i++) {
+    for (let j = i; j < bank.length; j++) {
+      if (combo2(bank[i], bank[j], E)) return true;
+    }
+  }
+  return false;
 }
 function parseXYZFromText(t){
   if (!t) return null;
@@ -694,6 +729,39 @@ app.post("/api/grade", async (req, res) => {
     if (!Array.isArray(student.steps)) student.steps = [];
     student.problem_plain = String(student.problem_plain || "").trim();
     student.conclusion    = String(student.conclusion || "").trim();
+     // === HARD CHECK từng bước theo đại số (ưu tiên hơn LLM) ===
+     const originals = parsed.problem_plain.split(/\r?\n/).map(parseLinearEq).filter(Boolean);
+     const bank = [...originals];  // các phương trình đã được xác thực
+     const stepAlignmentHard = [];
+ 
+     (student.steps || []).forEach((st, idx) => {
+       const eq = parseLinearEq(st.math || '');
+       const stepIndex = st.index || idx + 1;
+ 
+       if (!eq) {
+         stepAlignmentHard.push({ student_step_index: stepIndex, verdict: 'unclear', what: 'Không phát hiện phương trình để kiểm chứng.' });
+         return;
+       }
+ 
+       // Mâu thuẫn dạng 0x+0y+0z = d
+       if (Math.abs(eq.a) < 1e-9 && Math.abs(eq.b) < 1e-9 && Math.abs(eq.c) < 1e-9) {
+         if (Math.abs(eq.d) < 1e-9) {
+           stepAlignmentHard.push({ student_step_index: stepIndex, verdict: 'ok', what: 'Đẳng thức 0=0 hợp lệ.' });
+         } else {
+           stepAlignmentHard.push({ student_step_index: stepIndex, verdict: 'ok', what: `Phát hiện mâu thuẫn 0 = ${eq.d} (đúng thao tác khử).` });
+         }
+         bank.push(eq);
+         return;
+       }
+ 
+       if (isLinearComboOf(eq, bank)) {
+         stepAlignmentHard.push({ student_step_index: stepIndex, verdict: 'ok', what: 'Phương trình là tổ hợp tuyến tính hợp lệ của các phương trình trước.' });
+         bank.push(eq);
+       } else {
+         stepAlignmentHard.push({ student_step_index: stepIndex, verdict: 'unclear', what: 'Chưa chứng minh được đây là tổ hợp tuyến tính của các phương trình trước.' });
+       }
+     });
+ 
     const goldenMin = {
       method: solved.method,
       solution_summary: String(solved.solution_summary || "").slice(0, 300),
@@ -708,7 +776,6 @@ app.post("/api/grade", async (req, res) => {
       })),
       conclusion: String(student.conclusion || "").slice(0, 200),
     };
-    
     // 4) COMPARE: so sánh theo bước + so khớp kết luận
     const r4 = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -729,7 +796,6 @@ app.post("/api/grade", async (req, res) => {
     });
     let comparedRaw = r4.choices?.[0]?.message?.content || "{}";
     let compared = relaxedJsonParse(comparedRaw);
-
     // Retry 1 lần nếu vẫn hỏng JSON
     if (!compared) {
       const r4b = await openai.chat.completions.create({
@@ -765,7 +831,15 @@ app.post("/api/grade", async (req, res) => {
         fix_suggestions: []
       };
     }
-
+    // >>> BÂY GIỜ mới hợp nhất verdict với hard-check
+    if (Array.isArray(compared.steps_alignment)) {
+      compared.steps_alignment = compared.steps_alignment.map((s, i) => {
+        const hard = stepAlignmentHard[i];
+        return (hard && hard.verdict === 'ok')
+          ? { ...s, verdict: 'ok', what: hard.what, fix: '' }
+          : s;
+      });
+    }
     compared.verdict ||= "partial";
     compared.reason  ||= "";
     if (!Array.isArray(compared.steps_alignment)) compared.steps_alignment = [];
