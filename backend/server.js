@@ -270,7 +270,106 @@ class Frac {
   toString(){ return this.d===1 ? String(this.n) : `${this.n}/${this.d}`; }
   toNumber(){ return this.n/this.d; }
 }
+// Parse equation với 4 biến x, y, z, t
+function parseEq4(line) {
+  const [L, R] = line.split("=");
+  const S = v => v.replace(/\s+/g, "");
+  const left = S(L), right = Frac.from(S(R));
+  
+  const coef = (varr) => {
+    const m = left.match(new RegExp(`([+-]?\\d*(?:/\\d+)?)${varr}`, 'g')) || [];
+    return m.map(t => {
+      const k = t.replace(varr, "");
+      return k === "" || k === "+" ? Frac.from(1) : 
+             k === "-" ? Frac.from(-1) : Frac.from(k);
+    }).reduce((a, c) => a.add(c), Frac.from(0));
+  };
 
+  const ax = coef("x"), by = coef("y"), cz = coef("z"), dt = coef("t");
+  
+  // constant term on left (move to right)
+  const constLeft = left
+    .replace(/[+-]?\d*(?:\/\d+)?x/g, "")
+    .replace(/[+-]?\d*(?:\/\d+)?y/g, "")
+    .replace(/[+-]?\d*(?:\/\d+)?z/g, "")
+    .replace(/[+-]?\d*(?:\/\d+)?t/g, "");
+    
+  let cL = Frac.from(0);
+  constLeft.replace(/([+\-]?\d+(?:\/\d+)?)/g, (m) => { 
+    cL = cL.add(Frac.from(m)); 
+    return m; 
+  });
+  
+  return { abcd: [ax, by, cz, dt], d: right.sub(cL) };
+}
+
+// Solve hệ 3 phương trình 4 ẩn - kiểm tra tính tương thích
+function solve3Eq4Var(rows) {
+  // rows là mảng 3 phương trình dạng {abcd: [a,b,c,d], d: constant}
+  
+  // Kiểm tra xem hệ có vô số nghiệm hay không bằng hạng ma trận
+  const A = rows.map(r => [...r.abcd.map(f => f.toNumber()), r.d.toNumber()]);
+  
+  // Tính hạng ma trận hệ số và ma trận mở rộng
+  const rankA = computeRank(A.map(row => row.slice(0, 4)));
+  const rankAb = computeRank(A);
+  
+  console.log("Rank A:", rankA, "Rank Ab:", rankAb);
+  
+  if (rankAb > rankA) {
+    return { type: "none", x: null };
+  }
+  
+  if (rankA < 4) {
+    return { type: "infinite", x: null };
+  }
+  
+  // Nếu hạng = 4 nhưng chỉ có 3 phương trình -> vô số nghiệm
+  return { type: "infinite", x: null };
+}
+
+// Hàm tính hạng ma trận
+function computeRank(matrix) {
+  const M = matrix.map(row => row.slice());
+  const rows = M.length, cols = M[0].length;
+  let rank = 0;
+  
+  for (let col = 0; col < cols && rank < rows; col++) {
+    // Tìm pivot
+    let pivotRow = -1;
+    for (let i = rank; i < rows; i++) {
+      if (Math.abs(M[i][col]) > 1e-10) {
+        pivotRow = i;
+        break;
+      }
+    }
+    
+    if (pivotRow === -1) continue;
+    
+    // Swap rows
+    [M[rank], M[pivotRow]] = [M[pivotRow], M[rank]];
+    
+    // Normalize
+    const pivot = M[rank][col];
+    for (let j = col; j < cols; j++) {
+      M[rank][j] /= pivot;
+    }
+    
+    // Eliminate
+    for (let i = 0; i < rows; i++) {
+      if (i !== rank && Math.abs(M[i][col]) > 1e-10) {
+        const factor = M[i][col];
+        for (let j = col; j < cols; j++) {
+          M[i][j] -= factor * M[rank][j];
+        }
+      }
+    }
+    
+    rank++;
+  }
+  
+  return rank;
+}
 // Solve Ax=b. Return {type:"unique"|"none"|"infinite", x:[Frac,Frac,Frac]|null}
 function solve3(A,b){
   // deep copy in fraction
@@ -563,6 +662,112 @@ function isLinearComboOf(E, bank) {
   }
   return false;
 }
+// Hàm phát hiện số biến tự động từ đề bài
+function detectVariables(problemText) {
+  const lines = problemText.split('\n').filter(line => line.trim());
+  const allVars = new Set();
+  
+  lines.forEach(line => {
+      // Tìm tất cả biến (chữ cái đơn lẻ) trong phương trình
+      const matches = line.match(/\b[a-z]\b/gi);
+      if (matches) {
+          matches.forEach(v => allVars.add(v.toLowerCase()));
+      }
+  });
+  
+  // Loại bỏ các từ khóa không phải biến
+  const nonVars = ['pi', 'e', 'i', 'd', 'f']; // các hằng số toán học
+  nonVars.forEach(nv => allVars.delete(nv));
+  
+  return Array.from(allVars).sort();
+}
+
+// Parse equation linh hoạt theo số biến
+function parseEqFlex(line, variables) {
+  const [L, R] = line.split("=");
+  const S = v => v.replace(/\s+/g, "");
+  const left = S(L), right = Frac.from(S(R));
+  
+  const coefficients = {};
+  variables.forEach(v => {
+      const m = left.match(new RegExp(`([+-]?\\d*(?:/\\d+)?)${v}`, 'g')) || [];
+      coefficients[v] = m.map(t => {
+          const k = t.replace(v, "");
+          return k === "" || k === "+" ? Frac.from(1) : 
+                 k === "-" ? Frac.from(-1) : Frac.from(k);
+      }).reduce((a, c) => a.add(c), Frac.from(0));
+  });
+
+  // constant term on left (move to right)
+  let constLeft = left;
+  variables.forEach(v => {
+      constLeft = constLeft.replace(new RegExp(`[+-]?\\d*(?:/\\d+)?${v}`, 'g'), '');
+  });
+  
+  let cL = Frac.from(0);
+  constLeft.replace(/([+\-]?\d+(?:\/\d+)?)/g, (m) => { 
+      cL = cL.add(Frac.from(m)); 
+      return m; 
+  });
+  
+  return { 
+      coefficients: variables.map(v => coefficients[v] || Frac.from(0)), 
+      constant: right.sub(cL) 
+  };
+}
+
+// Solver linh hoạt theo số phương trình và biến
+function solveFlexible(rows, variables) {
+  const numEq = rows.length;
+  const numVars = variables.length;
+  
+  console.log(`Solving ${numEq} equations with ${numVars} variables: [${variables}]`);
+  
+  // Trường hợp đặc biệt: số phương trình < số biến → vô số nghiệm
+  if (numEq < numVars) {
+      return { type: "infinite", reason: `Số phương trình (${numEq}) < số biến (${numVars})` };
+  }
+  
+  // Ma trận A và vector b
+  const A = rows.map(r => r.coefficients.map(f => f.toNumber()));
+  const b = rows.map(r => r.constant.toNumber());
+  
+  const rankA = computeRank(A);
+  const Ab = A.map((row, i) => [...row, b[i]]);
+  const rankAb = computeRank(Ab);
+  
+  console.log(`Rank A: ${rankA}, Rank Ab: ${rankAb}`);
+  
+  if (rankAb > rankA) {
+      return { type: "none", reason: "Hệ vô nghiệm (rank A < rank Ab)" };
+  }
+  
+  if (rankA < numVars) {
+      return { type: "infinite", reason: `Hệ vô số nghiệm (rank A = ${rankA} < số biến = ${numVars})` };
+  }
+  
+  // Chỉ giải duy nhất nghiệm khi số phương trình = số biến và rank đủ
+  if (numEq === numVars && rankA === numVars) {
+      if (numVars === 3) {
+          // Dùng solver 3x3 cũ
+          const sol3 = solve3(A, b);
+          if (sol3.type === "unique") {
+              return { 
+                  type: "unique", 
+                  x: sol3.x,
+                  solution: variables.reduce((obj, v, i) => {
+                      obj[v] = sol3.x[i];
+                      return obj;
+                  }, {})
+              };
+          }
+          return sol3;
+      }
+      // Có thể mở rộng cho 2x2, 4x4 ở đây
+  }
+  
+  return { type: "infinite", reason: "Hệ vô số nghiệm" };
+}
 function parseXYZFromText(t){
   if (!t) return null;
   const s = t.replace(/\s+/g,'');
@@ -629,20 +834,29 @@ app.post("/api/grade", async (req, res) => {
     return { abc:[ax,by,cz], d: right.sub(cL) };
   }
 
-  const rows = eqs.map(parseEq);
-  const sol = solve3(rows.map(r=>r.abc.map(f=>f.toNumber?f:Frac.from(f))), rows.map(r=>r.d));
-  // Ground truth từ solver phân số
-  const ground = (()=>{
-    if (sol.type === "unique") {
-      return {
-        type: "unique",
-        exact: sol.x.map(fr => fr.toString()),               // ["2","0","2"] dạng phân số
-        summary: vecToLatex(sol.x)                           // "x = 2, y = 0, z = 2"
-      };
-    }
-    if (sol.type === "none")     return { type:"none",     exact:null, summary:"vô nghiệm" };
-    if (sol.type === "infinite") return { type:"infinite", exact:null, summary:"vô số nghiệm" };
-    return { type:"unknown", exact:null, summary:"unknown" };
+  // Tự động phát hiện biến
+  const variables = detectVariables(parsed.problem_plain);
+  console.log("Detected variables:", variables);
+
+  // Parse equations theo biến detect được
+  const rows = eqs.map(eq => parseEqFlex(eq, variables));
+
+  // Giải linh hoạt
+  const sol = solveFlexible(rows, variables);
+
+  // Cập nhật ground truth
+  const ground = (() => {
+      if (sol.type === "unique") {
+          const summary = variables.map((v, i) => `${v} = ${sol.x[i]}`).join(', ');
+          return {
+              type: "unique",
+              exact: sol.x.map(fr => fr.toString()),
+              summary: summary
+          };
+      }
+      if (sol.type === "none") return { type: "none", exact: null, summary: "vô nghiệm" };
+      if (sol.type === "infinite") return { type: "infinite", exact: null, summary: "vô số nghiệm" };
+      return { type: "unknown", exact: null, summary: "unknown" };
   })();
 
     // 2) SOLVE (STRICT): máy tự giải theo kiến thức nền tảng
