@@ -1,1 +1,9 @@
 node_modules/
+dist/
+
+cloudflared
+ngrok
+ngrok-*
+tmux-client-*
+*.log
+*.zip

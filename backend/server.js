@@ -28,6 +28,17 @@ const app = express();
 app.get('/health', (req, res) => res.json({ ok: true, pid: process.pid }));
 
 app.use(cors());
+const path = require('path');
+
+// serve static build của React
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+// wildcard route dùng REGEX, không dùng '*'
+app.get(/.*/, (_, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
+
+
 app.use(express.json({ limit: "10mb" }));
 
 const openai = new OpenAI({
