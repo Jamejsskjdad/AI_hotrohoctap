@@ -39,3 +39,139 @@ body{margin:0;font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;background:l
   overflow-x: auto;     /* tránh tràn */
   white-space: normal;  /* cho phép xuống dòng khối text */
 }
+/* Cho wrap có thể đặt icon nền */
+.wrap {
+  position: relative;
+  overflow: hidden;   /* chặn icon không tràn ra ngoài */
+}
+
+/* Lớp icon toán học ở nền */
+.math-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;   /* không cản click vào card */
+  z-index: 0;
+}
+
+/* Icon chung: kích thước & hiệu ứng */
+.math-icon {
+  position: absolute;
+  font-size: 80px;
+  opacity: 0.85;
+  filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.25));
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+/* Màu tươi để nổi bật trên nền tím */
+.math-icon-1  { color: #ffeb3b; }  /* vàng */
+.math-icon-2  { color: #ff9800; }  /* cam */
+.math-icon-3  { color: #4dd0e1; }  /* xanh ngọc */
+.math-icon-4  { color: #ba68c8; }  /* tím */
+.math-icon-5  { color: #66bb6a; }  /* xanh lá */
+.math-icon-6  { color: #ffd54f; }  /* vàng đậm */
+.math-icon-7  { color: #f06292; }  /* hồng */
+.math-icon-8  { color: #fff176; }  /* vàng nhạt */
+.math-icon-9  { color: #81d4fa; font-size: 40px; }
+.math-icon-10 { color: #c5e1a5; font-size: 46px; }
+.math-icon-11 { color: #ce93d8; font-size: 50px; }
+.math-icon-12 { color: #ffccbc; font-size: 44px; }
+
+/* Vị trí gốc quanh màn hình (không tràn ra ngoài) */
+.math-icon-1  { top: 6%;  left: 8%;  }
+.math-icon-2  { top: 18%; left: 14%; }
+.math-icon-3  { top: 10%; right: 10%; }
+.math-icon-4  { top: 26%; right: 6%;  }
+
+.math-icon-5  { top: 52%; left: 5%;  }
+.math-icon-6  { top: 50%; right: 8%; }
+
+.math-icon-7  { bottom: 14%; left: 10%; }
+.math-icon-8  { bottom: 8%;  right: 12%; }
+
+.math-icon-9  { top: 35%; left: 30%; }
+.math-icon-10 { top: 68%; right: 30%; }
+.math-icon-11 { bottom: 6%; left: 32%; }
+.math-icon-12 { top: 8%; right: 30%; }
+
+/* === Animation: trôi nhẹ quanh vị trí ban đầu (±30–40px) === */
+
+@keyframes driftSmallA {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  25%  { transform: translate(18px, -14px) rotate(6deg); }
+  50%  { transform: translate(-14px, 10px) rotate(-4deg); }
+  75%  { transform: translate(10px, 6px) rotate(3deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes driftSmallB {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  25%  { transform: translate(-16px, 16px) rotate(-6deg); }
+  50%  { transform: translate(20px, 8px) rotate(5deg); }
+  75%  { transform: translate(-10px, -12px) rotate(-3deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes driftSmallC {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  20%  { transform: translate(10px, 18px) rotate(6deg); }
+  40%  { transform: translate(-18px, 8px) rotate(-5deg); }
+  60%  { transform: translate(12px, -16px) rotate(4deg); }
+  80%  { transform: translate(-8px, -6px) rotate(-3deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* Gán animation cho từng icon, thời gian + delay khác nhau
+   → nhìn trôi "ngẫu nhiên" nhưng vẫn quanh màn hình */
+.math-icon-1  { animation: driftSmallA 14s infinite; }
+.math-icon-2  { animation: driftSmallB 16s infinite; animation-delay: -3s; }
+.math-icon-3  { animation: driftSmallC 18s infinite; animation-delay: -6s; }
+.math-icon-4  { animation: driftSmallA 20s infinite; animation-delay: -2s; }
+
+.math-icon-5  { animation: driftSmallB 19s infinite; animation-delay: -5s; }
+.math-icon-6  { animation: driftSmallC 17s infinite; animation-delay: -4s; }
+
+.math-icon-7  { animation: driftSmallA 21s infinite; animation-delay: -7s; }
+.math-icon-8  { animation: driftSmallB 22s infinite; animation-delay: -1s; }
+
+.math-icon-9  { animation: driftSmallC 15s infinite; animation-delay: -2.5s; }
+.math-icon-10 { animation: driftSmallB 18s infinite; animation-delay: -6.5s; }
+.math-icon-11 { animation: driftSmallA 20s infinite; animation-delay: -3.5s; }
+.math-icon-12 { animation: driftSmallC 16s infinite; animation-delay: -4.5s; }
+
+/* Card luôn trên icon */
+.card {
+  position: relative;
+  z-index: 1;
+}
+/* =========================
+   ICON KHOA HỌC – KỸ THUẬT
+   ========================= */
+
+   .tech-icon {
+    position: absolute;
+    font-size: 70px;              /* nhỏ hơn icon toán một chút */
+    opacity: 0.9;
+    filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.3));
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+  }
+  
+  /* Màu sắc nổi bật, hơi “công nghệ” */
+  .tech-icon-1 { color: #00e676; }   /* robot – xanh neon */
+  .tech-icon-2 { color: #40c4ff; }   /* microchip – xanh cyan */
+  .tech-icon-3 { color: #ffc400; }   /* gears – vàng kỹ thuật */
+  .tech-icon-4 { color: #ff4081; }   /* atom – hồng neon */
+  
+  /* Vị trí xuất phát xung quanh card (vẫn trong màn hình) */
+  .tech-icon-1 { top: 14%;  left: 2%;  }
+  .tech-icon-2 { top: 60%;  right: 2%; }
+  .tech-icon-3 { bottom: 4%; left: 55%; }
+  .tech-icon-4 { top: 4%;   right: 55%; }
+  
+  /* Dùng lại animation trôi nhẹ quanh vị trí ban đầu */
+  .tech-icon-1 { animation: driftSmallA 18s infinite; animation-delay: -4s; }
+  .tech-icon-2 { animation: driftSmallB 20s infinite; animation-delay: -7s; }
+  .tech-icon-3 { animation: driftSmallC 22s infinite; animation-delay: -3s; }
+  .tech-icon-4 { animation: driftSmallA 19s infinite; animation-delay: -9s; }
+  

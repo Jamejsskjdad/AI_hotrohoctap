@@ -12,37 +12,44 @@ function safeStr(v) {
 
 export default function App() {
   const fileRef = useRef(null);
-     const [previews, setPreviews] = useState([]);     // NEW: nhiều ảnh
-     const [rawText, setRawText] = useState("");       // plain_text từ OCR    
+  const [previews, setPreviews] = useState([]);     // NEW: nhiều ảnh
+  const [rawText, setRawText] = useState("");       // plain_text từ OCR
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
   async function handleFiles(e) {                    // NEW
-         const files = Array.from(e.target.files || []);
-         if (!files.length) return;
-    
-         // hiển thị preview nhiều ảnh
-         const pv = await Promise.all(files.map(f => new Promise(res => {
-           const r = new FileReader();
-           r.onload = ev => res(String(ev.target?.result || ""));
-           r.readAsDataURL(f);
-        })));
-         setPreviews(pv);
-    
-         // gửi FormData đến /api/ocr
-         setLoading(true);
-         const fd = new FormData();
-         files.forEach(f => fd.append("files", f));
-         try {
-           const ocr = await fetch(`${API_BASE}/api/ocr`, { method: "POST", body: fd })
-             .then(r => r.json());
-           if (ocr?.error) throw new Error(ocr.error);
-           setRawText(ocr.plain_text || "");
-         } catch (err) {
-           alert("OCR lỗi, vui lòng thử lại.\n" + (err?.message || ""));
-         } finally {
-           setLoading(false);
-         }
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    // hiển thị preview nhiều ảnh
+    const pv = await Promise.all(
+      files.map(
+        (f) =>
+          new Promise((res) => {
+            const r = new FileReader();
+            r.onload = (ev) => res(String(ev.target?.result || ""));
+            r.readAsDataURL(f);
+          })
+      )
+    );
+    setPreviews(pv);
+
+    // gửi FormData đến /api/ocr
+    setLoading(true);
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    try {
+      const ocr = await fetch(`${API_BASE}/api/ocr`, {
+        method: "POST",
+        body: fd,
+      }).then((r) => r.json());
+      if (ocr?.error) throw new Error(ocr.error);
+      setRawText(ocr.plain_text || "");
+    } catch (err) {
+      alert("OCR lỗi, vui lòng thử lại.\n" + (err?.message || ""));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function analyze() {
@@ -76,11 +83,17 @@ export default function App() {
       }),
     }).catch(() => {});
     setLoading(false);
-    setTimeout(() => document.getElementById("result")?.scrollIntoView({ behavior: "smooth" }), 50);
+    setTimeout(
+      () =>
+        document
+          .getElementById("result")
+          ?.scrollIntoView({ behavior: "smooth" }),
+      50
+    );
   }
 
   function resetAll() {
-    setPreviews([]);   
+    setPreviews([]);
     setResult(null);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -88,27 +101,75 @@ export default function App() {
   const fullSolution = safeStr(
     result?.model_solution_latex ?? result?.model_solution ?? ""
   );
+
   return (
     <main className="wrap">
+      {/* Lớp icon toán học ở nền background */}
+      <div className="math-bg" aria-hidden="true">
+        {/* góc trên trái */}
+        <i className="fa-solid fa-square-root-variable math-icon math-icon-1" />
+        <i className="fa-solid fa-xmark math-icon math-icon-2" />
+
+        {/* phía trên phải */}
+        <i className="fa-solid fa-divide math-icon math-icon-3" />
+        <i className="fa-solid fa-infinity math-icon math-icon-4" />
+
+        {/* giữa trái / giữa phải */}
+        <i className="fa-solid fa-superscript math-icon math-icon-5" />
+        <i className="fa-solid fa-plus-minus math-icon math-icon-6" />
+
+        {/* dưới trái / dưới phải */}
+        <i className="fa-solid fa-plus math-icon math-icon-7" />
+        <i className="fa-solid fa-equals math-icon math-icon-8" />
+
+        {/* thêm vài icon nhỏ làm nền phụ */}
+        <i className="fa-solid fa-circle-dot math-icon math-icon-9" />
+        <i className="fa-solid fa-minus math-icon math-icon-10" />
+        <i className="fa-solid fa-square-root-variable math-icon math-icon-11" />
+        <i className="fa-solid fa-divide math-icon math-icon-12" />
+        {/* ICON KHOA HỌC – KỸ THUẬT */}
+        <i className="fa-solid fa-robot tech-icon tech-icon-1" />
+        <i className="fa-solid fa-microchip tech-icon tech-icon-2" />
+        <i className="fa-solid fa-gears tech-icon tech-icon-3" />
+        <i className="fa-solid fa-atom tech-icon tech-icon-4" />
+      </div>
       <div className="card">
         <div className="header">
-          <h1><i className="fa-solid fa-brain" /> Ứng dụng AI Hỗ Trợ Nhận Diện và Sửa Lỗi</h1>
+          <h1>
+            <i className="fa-solid fa-brain" /> Ứng dụng AI Hỗ Trợ Nhận Diện và
+            Sửa Lỗi
+          </h1>
           <p>Hệ phương trình bậc nhất ba ẩn</p>
         </div>
 
         <div className="upload" onClick={() => fileRef.current?.click()}>
-           <i className={`fa-solid ${previews.length ? "fa-check-circle" : "fa-cloud-upload-alt"} icon`} />
-           <div className="label">Tải lên ảnh lời giải của học sinh</div>
-           <p className="hint">Chọn nhiều ảnh (JPG/PNG)</p>
-           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={handleFiles} />
-           {previews.length > 0 && previews.map((src, i) => (
-             <img key={i} src={src} className="preview" />
-           ))}
-         </div>
+          <i
+            className={`fa-solid ${
+              previews.length ? "fa-check-circle" : "fa-cloud-upload-alt"
+            } icon`}
+          />
+          <div className="label">Tải lên ảnh lời giải của học sinh</div>
+          <p className="hint">Chọn nhiều ảnh (JPG/PNG)</p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={handleFiles}
+          />
+          {previews.length > 0 &&
+            previews.map((src, i) => <img key={i} src={src} className="preview" />)}
+        </div>
 
         <div className="btns">
-          <button className="btn primary" disabled={!rawText || loading} onClick={analyze}>
-            <i className="fa-solid fa-search" /> {loading ? "Đang phân tích..." : "Phân tích lời giải"}
+          <button
+            className="btn primary"
+            disabled={!rawText || loading}
+            onClick={analyze}
+          >
+            <i className="fa-solid fa-search" />{" "}
+            {loading ? "Đang phân tích..." : "Phân tích lời giải"}
           </button>
           <button className="btn" onClick={resetAll}>
             <i className="fa-solid fa-rotate-right" /> Thử lại bài khác
@@ -120,38 +181,51 @@ export default function App() {
             <summary>Bài làm của học sinh sau khi chuyển đổi</summary>
             <pre className="pre">{rawText}</pre>
           </details>
-        )}       
+        )}
         {result && (
           <section id="result" className="box">
-            <h2><i className="fa-solid fa-clipboard-check" /> Kết quả phân tích</h2>
+            <h2>
+              <i className="fa-solid fa-clipboard-check" /> Kết quả phân tích
+            </h2>
 
             {/* Đề bài chuẩn hoá */}
             {safeStr(result?.normalized_problem) && (
               <div className="subbox">
-                <h3 className="title"><i className="fa-solid fa-square-root-variable" /> Đề bài chuẩn hoá</h3>
+                <h3 className="title">
+                  <i className="fa-solid fa-square-root-variable" /> Đề bài chuẩn
+                  hoá
+                </h3>
                 <MathBlock latex={safeStr(result?.normalized_problem)} />
               </div>
             )}
 
             {/* Lỗi phát hiện */}
             <div className="subbox">
-              <h3 className="title warn"><i className="fa-solid fa-triangle-exclamation" /> Lỗi phát hiện</h3>
+              <h3 className="title warn">
+                <i className="fa-solid fa-triangle-exclamation" /> Lỗi phát hiện
+              </h3>
               {(result.step_errors?.length ?? 0) > 0 ? (
                 result.step_errors.map((e, i) => (
                   <div key={i} className="error">
-                    <b>{e.step != null ? `Bước ${e.step}` : "Bước ?"} — {e.code}</b> — {e.what}
+                    <b>
+                      {e.step != null ? `Bước ${e.step}` : "Bước ?"} — {e.code}
+                    </b>{" "}
+                    — {e.what}
                     {e.fix ? ` (Sửa: ${e.fix})` : ""}
                   </div>
                 ))
               ) : (
-                <div className="text-gray-500">Không phát hiện lỗi nào hoặc kết quả rỗng.</div>
+                <div className="text-gray-500">
+                  Không phát hiện lỗi nào hoặc kết quả rỗng.
+                </div>
               )}
             </div>
-           
 
             {/* Gợi ý sửa lỗi */}
             <div className="subbox" style={{ background: "#FFF6E5" }}>
-              <h3 className="title"><i className="fa-regular fa-lightbulb" /> Gợi ý sửa lỗi</h3>
+              <h3 className="title">
+                <i className="fa-regular fa-lightbulb" /> Gợi ý sửa lỗi
+              </h3>
               {(result.fix_suggestions?.length ?? 0) > 0 ? (
                 result.fix_suggestions.map((s, i) => {
                   const latex = safeStr(s?.latex);
@@ -168,28 +242,49 @@ export default function App() {
                 <div className="text-gray-500">Chưa có gợi ý cụ thể.</div>
               )}
             </div>
+
             {/* Lời giải đúng */}
             <div className="subbox" style={{ background: "#e8f5e9" }}>
-              <h3 className="title ok"><i className="fa-solid fa-circle-check" /> Lời giải đúng</h3>
+              <h3 className="title ok">
+                <i className="fa-solid fa-circle-check" /> Lời giải đúng
+              </h3>
               <div style={{ paddingLeft: 10 }}>
                 <details style={{ marginBottom: 10 }}>
-                  <summary><b>Hệ phương trình (xem/ẩn)</b></summary>
+                  <summary>
+                    <b>Hệ phương trình (xem/ẩn)</b>
+                  </summary>
                   <MathBlock latex={safeStr(result?.normalized_problem)} />
                 </details>
 
                 {/* Tóm tắt gọn (nếu có) */}
-                {result.solution_card?.solution_summary && 
-                result.solution_card.solution_summary !== "unknown" &&(
-                  <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
-                    <b>Nghiệm:</b>
-                    {(/[\\^_{}]|\\frac|\\dfrac|\\left|\\right/.test(result.solution_card.solution_summary))
-                      ? <MathBlock latex={String(result.solution_card.solution_summary)} inline />
-                      : <span>{result.solution_card.solution_summary}</span>}
-                  </div>
-                )}
+                {result.solution_card?.solution_summary &&
+                  result.solution_card.solution_summary !== "unknown" && (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                      }}
+                    >
+                      <b>Nghiệm:</b>
+                      {(/[\\^_{}]|\\frac|\\dfrac|\\left|\\right/.test(
+                        result.solution_card.solution_summary
+                      )) ? (
+                        <MathBlock
+                          latex={String(result.solution_card.solution_summary)}
+                          inline
+                        />
+                      ) : (
+                        <span>{result.solution_card.solution_summary}</span>
+                      )}
+                    </div>
+                  )}
 
                 {result.solution_card?.method_used && (
-                  <p><b>Phương pháp giải:</b> {result.solution_card.method_used}</p>
+                  <p>
+                    <b>Phương pháp giải:</b> {result.solution_card.method_used}
+                  </p>
                 )}
                 {result.solution_card?.main_steps?.length > 0 && (
                   <div>
@@ -201,31 +296,45 @@ export default function App() {
                     </ul>
                   </div>
                 )}
-                {/* Bài tập gợi ý (chỉ đề) */}
-                {Array.isArray(result?.practice_list) && result.practice_list.length > 0 && (
-                  <div className="subbox">
-                    <h3 className="title">
-                      <i className="fa-solid fa-list-check" /> Bài tập gợi ý
-                    </h3>
-                    <div style={{ display: "grid", gap: 12 }}>
-                      {result.practice_list.map((p) => (
-                        <div key={p.index} className="box" style={{ background: "#f9f9ff" }}>
-                          <div style={{ fontWeight: 600, marginBottom: 6 }}>Bài {p.index}</div>
-                          <MathBlock latex={safeStr(p.latex)} />
-                          {Array.isArray(p.tags) && p.tags.length > 0 && (
-                            <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
-                              {p.tags.map((t, i) => (
-                                <span key={i} style={{ marginRight: 8 }}>#{t}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-               
+                {/* Bài tập gợi ý (chỉ đề) */}
+                {Array.isArray(result?.practice_list) &&
+                  result.practice_list.length > 0 && (
+                    <div className="subbox">
+                      <h3 className="title">
+                        <i className="fa-solid fa-list-check" /> Bài tập gợi ý
+                      </h3>
+                      <div style={{ display: "grid", gap: 12 }}>
+                        {result.practice_list.map((p) => (
+                          <div
+                            key={p.index}
+                            className="box"
+                            style={{ background: "#f9f9ff" }}
+                          >
+                            <div
+                              style={{ fontWeight: 600, marginBottom: 6 }}
+                            >{`Bài ${p.index}`}</div>
+                            <MathBlock latex={safeStr(p.latex)} />
+                            {Array.isArray(p.tags) && p.tags.length > 0 && (
+                              <div
+                                style={{
+                                  marginTop: 6,
+                                  fontSize: 12,
+                                  color: "#666",
+                                }}
+                              >
+                                {p.tags.map((t, i) => (
+                                  <span key={i} style={{ marginRight: 8 }}>
+                                    #{t}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           </section>
