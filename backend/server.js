@@ -282,62 +282,62 @@ class Frac {
   toNumber(){ return this.n/this.d; }
 }
 // Parse equation với 4 biến x, y, z, t
-function parseEq4(line) {
-  const [L, R] = line.split("=");
-  const S = v => v.replace(/\s+/g, "");
-  const left = S(L), right = Frac.from(S(R));
+// function parseEq4(line) {
+//   const [L, R] = line.split("=");
+//   const S = v => v.replace(/\s+/g, "");
+//   const left = S(L), right = Frac.from(S(R));
   
-  const coef = (varr) => {
-    const m = left.match(new RegExp(`([+-]?\\d*(?:/\\d+)?)${varr}`, 'g')) || [];
-    return m.map(t => {
-      const k = t.replace(varr, "");
-      return k === "" || k === "+" ? Frac.from(1) : 
-             k === "-" ? Frac.from(-1) : Frac.from(k);
-    }).reduce((a, c) => a.add(c), Frac.from(0));
-  };
+//   const coef = (varr) => {
+//     const m = left.match(new RegExp(`([+-]?\\d*(?:/\\d+)?)${varr}`, 'g')) || [];
+//     return m.map(t => {
+//       const k = t.replace(varr, "");
+//       return k === "" || k === "+" ? Frac.from(1) : 
+//              k === "-" ? Frac.from(-1) : Frac.from(k);
+//     }).reduce((a, c) => a.add(c), Frac.from(0));
+//   };
 
-  const ax = coef("x"), by = coef("y"), cz = coef("z"), dt = coef("t");
+//   const ax = coef("x"), by = coef("y"), cz = coef("z"), dt = coef("t");
   
-  // constant term on left (move to right)
-  const constLeft = left
-    .replace(/[+-]?\d*(?:\/\d+)?x/g, "")
-    .replace(/[+-]?\d*(?:\/\d+)?y/g, "")
-    .replace(/[+-]?\d*(?:\/\d+)?z/g, "")
-    .replace(/[+-]?\d*(?:\/\d+)?t/g, "");
+//   // constant term on left (move to right)
+//   const constLeft = left
+//     .replace(/[+-]?\d*(?:\/\d+)?x/g, "")
+//     .replace(/[+-]?\d*(?:\/\d+)?y/g, "")
+//     .replace(/[+-]?\d*(?:\/\d+)?z/g, "")
+//     .replace(/[+-]?\d*(?:\/\d+)?t/g, "");
     
-  let cL = Frac.from(0);
-  constLeft.replace(/([+\-]?\d+(?:\/\d+)?)/g, (m) => { 
-    cL = cL.add(Frac.from(m)); 
-    return m; 
-  });
+//   let cL = Frac.from(0);
+//   constLeft.replace(/([+\-]?\d+(?:\/\d+)?)/g, (m) => { 
+//     cL = cL.add(Frac.from(m)); 
+//     return m; 
+//   });
   
-  return { abcd: [ax, by, cz, dt], d: right.sub(cL) };
-}
+//   return { abcd: [ax, by, cz, dt], d: right.sub(cL) };
+// }
 
-// Solve hệ 3 phương trình 4 ẩn - kiểm tra tính tương thích
-function solve3Eq4Var(rows) {
-  // rows là mảng 3 phương trình dạng {abcd: [a,b,c,d], d: constant}
+// // Solve hệ 3 phương trình 4 ẩn - kiểm tra tính tương thích
+// function solve3Eq4Var(rows) {
+//   // rows là mảng 3 phương trình dạng {abcd: [a,b,c,d], d: constant}
   
-  // Kiểm tra xem hệ có vô số nghiệm hay không bằng hạng ma trận
-  const A = rows.map(r => [...r.abcd.map(f => f.toNumber()), r.d.toNumber()]);
+//   // Kiểm tra xem hệ có vô số nghiệm hay không bằng hạng ma trận
+//   const A = rows.map(r => [...r.abcd.map(f => f.toNumber()), r.d.toNumber()]);
   
-  // Tính hạng ma trận hệ số và ma trận mở rộng
-  const rankA = computeRank(A.map(row => row.slice(0, 4)));
-  const rankAb = computeRank(A);
+//   // Tính hạng ma trận hệ số và ma trận mở rộng
+//   const rankA = computeRank(A.map(row => row.slice(0, 4)));
+//   const rankAb = computeRank(A);
   
-  console.log("Rank A:", rankA, "Rank Ab:", rankAb);
+//   console.log("Rank A:", rankA, "Rank Ab:", rankAb);
   
-  if (rankAb > rankA) {
-    return { type: "none", x: null };
-  }
+//   if (rankAb > rankA) {
+//     return { type: "none", x: null };
+//   }
   
-  if (rankA < 4) {
-    return { type: "infinite", x: null };
-  }
+//   if (rankA < 4) {
+//     return { type: "infinite", x: null };
+//   }
   
-  // Nếu hạng = 4 nhưng chỉ có 3 phương trình -> vô số nghiệm
-  return { type: "infinite", x: null };
-}
+//   // Nếu hạng = 4 nhưng chỉ có 3 phương trình -> vô số nghiệm
+//   return { type: "infinite", x: null };
+// }
 
 // Hàm tính hạng ma trận
 function computeRank(matrix) {
@@ -422,7 +422,7 @@ function solve3(A,b){
 }
 
 // Helper to latex a fraction vector:
-function vecToLatex(fr){ return `x = ${fr[0]}, y = ${fr[1]}, z = ${fr[2]}`; }
+//function vecToLatex(fr){ return `x = ${fr[0]}, y = ${fr[1]}, z = ${fr[2]}`; }
 
 // =============== OCR bằng model vision (nhiều ảnh) ===============
 app.post("/api/ocr", upload.array("files", 12), async (req, res) => {
@@ -547,79 +547,79 @@ function classifySolutionType(summary) {
   if (s.includes("x =") || s.includes("y =") || s.includes("z =")) return "unique";
   return "unknown";
 }
-// ---- Linear algebra verifier (float, tolerance) ----
-function parseSystem3(problem_plain) {
-  // mỗi dòng dạng ax+by+cz=d, có thể có khoảng trắng
-  const lines = String(problem_plain || "")
-    .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  if (lines.length !== 3) throw new Error("EXPECT_3_EQUATIONS");
+// // ---- Linear algebra verifier (float, tolerance) ----
+// function parseSystem3(problem_plain) {
+//   // mỗi dòng dạng ax+by+cz=d, có thể có khoảng trắng
+//   const lines = String(problem_plain || "")
+//     .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+//   if (lines.length !== 3) throw new Error("EXPECT_3_EQUATIONS");
 
-  const A = [], b = [];
-  for (const ln of lines) {
-    // chuẩn hoá: đưa về dạng ... = ...
-    const m = ln.replace(/\s+/g, "")
-      .match(/^(.+)=([^=]+)$/);
-    if (!m) throw new Error("BAD_EQUATION: " + ln);
-    const left = m[1], right = m[2];
+//   const A = [], b = [];
+//   for (const ln of lines) {
+//     // chuẩn hoá: đưa về dạng ... = ...
+//     const m = ln.replace(/\s+/g, "")
+//       .match(/^(.+)=([^=]+)$/);
+//     if (!m) throw new Error("BAD_EQUATION: " + ln);
+//     const left = m[1], right = m[2];
 
-    // tách hệ số x,y,z từ vế trái
-    const coef = { x:0, y:0, z:0 };
-    // chuẩn hoá dấu +-
-    const terms = left.replace(/-/g, "+-").split("+").filter(s=>s!=="");
-    for (let t of terms) {
-      const mxy = t.match(/^(-?(?:\d+(?:\.\d+)?)?)([xyz])$/i);
-      if (!mxy) throw new Error("BAD_TERM: "+t+" in "+ln);
-      let val = mxy[1];
-      const v = mxy[2].toLowerCase();
-      if (val === "" || val === "+") val = "1";
-      if (val === "-") val = "-1";
-      coef[v] += parseFloat(val);
-    }
-    A.push([coef.x, coef.y, coef.z]);
-    b.push(parseFloat(right));
-  }
-  return { A, b };
-}
+//     // tách hệ số x,y,z từ vế trái
+//     const coef = { x:0, y:0, z:0 };
+//     // chuẩn hoá dấu +-
+//     const terms = left.replace(/-/g, "+-").split("+").filter(s=>s!=="");
+//     for (let t of terms) {
+//       const mxy = t.match(/^(-?(?:\d+(?:\.\d+)?)?)([xyz])$/i);
+//       if (!mxy) throw new Error("BAD_TERM: "+t+" in "+ln);
+//       let val = mxy[1];
+//       const v = mxy[2].toLowerCase();
+//       if (val === "" || val === "+") val = "1";
+//       if (val === "-") val = "-1";
+//       coef[v] += parseFloat(val);
+//     }
+//     A.push([coef.x, coef.y, coef.z]);
+//     b.push(parseFloat(right));
+//   }
+//   return { A, b };
+// }
 
-function det3(A) {
-  const [[a,b,c],[d,e,f],[g,h,i]] = A;
-  return a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g);
-}
+// function det3(A) {
+//   const [[a,b,c],[d,e,f],[g,h,i]] = A;
+//   return a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g);
+// }
 
-function rank(A) {
-  // Gaussian elimination (simple, float)
-  const M = A.map(r => r.slice());
-  const n = M.length, m = M[0].length;
-  let rnk = 0, row = 0;
-  const EPS = 1e-9;
-  for (let col=0; col<m && row<n; col++) {
-    // tìm pivot
-    let sel = row;
-    for (let i=row; i<n; i++) if (Math.abs(M[i][col]) > Math.abs(M[sel][col])) sel = i;
-    if (Math.abs(M[sel][col]) < EPS) continue;
-    // swap
-    [M[row], M[sel]] = [M[sel], M[row]];
-    // normalize & eliminate
-    const piv = M[row][col];
-    for (let j=col; j<m; j++) M[row][j] /= piv;
-    for (let i=0; i<n; i++) if (i!==row) {
-      const factor = M[i][col];
-      for (let j=col; j<m; j++) M[i][j] -= factor*M[row][j];
-    }
-    row++; rnk++;
-  }
-  return rnk;
-}
+// function rank(A) {
+//   // Gaussian elimination (simple, float)
+//   const M = A.map(r => r.slice());
+//   const n = M.length, m = M[0].length;
+//   let rnk = 0, row = 0;
+//   const EPS = 1e-9;
+//   for (let col=0; col<m && row<n; col++) {
+//     // tìm pivot
+//     let sel = row;
+//     for (let i=row; i<n; i++) if (Math.abs(M[i][col]) > Math.abs(M[sel][col])) sel = i;
+//     if (Math.abs(M[sel][col]) < EPS) continue;
+//     // swap
+//     [M[row], M[sel]] = [M[sel], M[row]];
+//     // normalize & eliminate
+//     const piv = M[row][col];
+//     for (let j=col; j<m; j++) M[row][j] /= piv;
+//     for (let i=0; i<n; i++) if (i!==row) {
+//       const factor = M[i][col];
+//       for (let j=col; j<m; j++) M[i][j] -= factor*M[row][j];
+//     }
+//     row++; rnk++;
+//   }
+//   return rnk;
+// }
 
-function solveUnique(A,b){
-  // Cramer (vì 3x3)
-  const D = det3(A);
-  const replaceCol = (k) => A.map((row,i)=> row.map((v,j)=> j===k ? b[i] : v));
-  const Dx = det3(replaceCol(0));
-  const Dy = det3(replaceCol(1));
-  const Dz = det3(replaceCol(2));
-  return { x: Dx/D, y: Dy/D, z: Dz/D };
-}
+// function solveUnique(A,b){
+//   // Cramer (vì 3x3)
+//   const D = det3(A);
+//   const replaceCol = (k) => A.map((row,i)=> row.map((v,j)=> j===k ? b[i] : v));
+//   const Dx = det3(replaceCol(0));
+//   const Dy = det3(replaceCol(1));
+//   const Dz = det3(replaceCol(2));
+//   return { x: Dx/D, y: Dy/D, z: Dz/D };
+// }
 // ---- Deterministic step checker: kiểm tra 1 phương trình có là tổ hợp tuyến tính của các PT trước đó không
 
 function parseLinearEq(line) {
