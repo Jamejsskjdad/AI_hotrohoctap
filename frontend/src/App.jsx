@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import "./style.css";
 import MathBlock from "./components/MathBlock.jsx";
 
@@ -16,6 +16,49 @@ export default function App() {
   const [rawText, setRawText] = useState("");       // plain_text từ OCR
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  // ===== Icon nền sinh ngẫu nhiên quanh khối card =====
+  const autoIcons = useMemo(() => {
+    const RANDOM_MATH_ICONS = [
+      "fa-square-root-variable",
+      "fa-xmark",
+      "fa-divide",
+      "fa-plus-minus",
+      "fa-plus",
+      "fa-equals",
+      "fa-circle-dot",
+    ];
+    const DRIFTS = ["driftSmallA", "driftSmallB", "driftSmallC"];
+    const COUNT = 18; // số lượng icon random
+
+    return Array.from({ length: COUNT }).map((_, i) => {
+      const icon = RANDOM_MATH_ICONS[i % RANDOM_MATH_ICONS.length];
+
+      // Giới hạn vùng xuất hiện quanh card (khoảng 18–82% chiều ngang, 18–78% chiều dọc)
+      const left = 18 + Math.random() * 64;
+      const top = 18 + Math.random() * 60;
+
+      const size = 34 + (i % 5) * 4; // 34–50px
+      const drift = DRIFTS[i % DRIFTS.length];
+      const duration = 16 + (i % 5) * 2; // 16–24s
+      const delay = -Math.random() * 20; // lệch nhịp
+
+      return (
+        <i
+          key={`auto-${i}`}
+          className={`fa-solid ${icon} math-icon auto-math-icon`}
+          style={{
+            left: `${left}%`,
+            top: `${top}%`,
+            fontSize: `${size}px`,
+            opacity: 0.35,
+            animationName: drift,
+            animationDuration: `${duration}s`,
+            animationDelay: `${delay}s`,
+          }}
+        />
+      );
+    });
+  }, []);
 
   async function handleFiles(e) {                    // NEW
     const files = Array.from(e.target.files || []);
@@ -132,6 +175,22 @@ export default function App() {
         <i className="fa-solid fa-microchip tech-icon tech-icon-2" />
         <i className="fa-solid fa-gears tech-icon tech-icon-3" />
         <i className="fa-solid fa-atom tech-icon tech-icon-4" />
+        {/* Icon toán học bổ sung – kích thước nhỏ hơn, rải quanh mép màn hình */}
+        <i className="fa-solid fa-square-root-variable math-icon math-icon-13" />
+        <i className="fa-solid fa-divide math-icon math-icon-14" />
+        <i className="fa-solid fa-plus-minus math-icon math-icon-15" />
+        <i className="fa-solid fa-circle-dot math-icon math-icon-16" />
+
+        {/* Icon khoa học – kỹ thuật bổ sung */}
+        <i className="fa-solid fa-brain tech-icon tech-icon-5" />
+        <i className="fa-solid fa-flask tech-icon tech-icon-6" />
+        {/* Icon toán học bổ sung – nằm sát hai bên khối card chính */}
+        <i className="fa-solid fa-xmark math-icon math-icon-17" />
+        <i className="fa-solid fa-plus math-icon math-icon-18" />
+        <i className="fa-solid fa-square-root-variable math-icon math-icon-19" />
+        <i className="fa-solid fa-divide math-icon math-icon-20" />
+        
+        {autoIcons}
       </div>
       <div className="card">
         <div className="header">

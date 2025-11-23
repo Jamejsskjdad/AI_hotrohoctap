@@ -174,4 +174,68 @@ body{margin:0;font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;background:l
   .tech-icon-2 { animation: driftSmallB 20s infinite; animation-delay: -7s; }
   .tech-icon-3 { animation: driftSmallC 22s infinite; animation-delay: -3s; }
   .tech-icon-4 { animation: driftSmallA 19s infinite; animation-delay: -9s; }
-  
+  /* Icon toán học bổ sung – nhỏ hơn để không che nội dung */
+  .math-icon-13 { color: #b3e5fc; font-size: 38px; }  /* xanh nhạt */
+  .math-icon-14 { color: #ffe082; font-size: 40px; }  /* vàng nhạt */
+  .math-icon-15 { color: #c5cae9; font-size: 36px; }  /* tím nhạt */
+  .math-icon-16 { color: #ffab91; font-size: 34px; }  /* cam nhạt */
+  /* Vị trí cho các icon toán bổ sung – bám sát mép ngoài để không chồng lên card */
+  .math-icon-13 { top: 12%;  left: 50%; }
+  .math-icon-14 { top: 72%;  left: 4%;  }
+  .math-icon-15 { bottom: 12%; right: 4%; }
+  .math-icon-16 { top: 44%;  right: 8%; }
+  .math-icon-13 { animation: driftSmallA 19s infinite; animation-delay: -8s; }
+  .math-icon-14 { animation: driftSmallB 17s infinite; animation-delay: -5.5s; }
+  .math-icon-15 { animation: driftSmallC 21s infinite; animation-delay: -2s; }
+  .math-icon-16 { animation: driftSmallA 23s infinite; animation-delay: -10s; }
+  /* Icon khoa học – kỹ thuật bổ sung */
+  .tech-icon-5 { color: #b39ddb; }   /* brain – tím nhạt */
+  .tech-icon-6 { color: #ffcc80; }   /* flask – cam nhạt */
+
+  /* Vị trí: lệch lên/xuống một chút để cân đối */
+  .tech-icon-5 { top: 30%;  left: 6%;  }
+  .tech-icon-6 { bottom: 10%; right: 8%; }
+
+  /* Animation trôi nhẹ cho tech-icon mới */
+  .tech-icon-5 { animation: driftSmallB 21s infinite; animation-delay: -6s; }
+  .tech-icon-6 { animation: driftSmallC 19s infinite; animation-delay: -8s; }
+  /* Icon toán học mới – áp sát khối card */
+  .math-icon-17 { color: #ff8a80; font-size: 60px; }  /* dấu X cam */
+  .math-icon-18 { color: #81c784; font-size: 54px; }  /* dấu + xanh lá */
+  .math-icon-19 { color: #90caf9; font-size: 58px; }  /* căn bậc hai xanh nhạt */
+  .math-icon-20 { color: #ffd54f; font-size: 52px; }  /* chia vàng */
+  /* Vị trí cho icon 17–20: ôm sát cạnh trái/phải của card trung tâm */
+  .math-icon-17 { 
+    top: 26%;      /* cạnh trái, hơi phía trên */
+    left: 19%;     /* gần mép trái của card (card rộng ~900px trên màn 1440px) */
+  }
+
+  .math-icon-18 { 
+    top: 66%;      /* cạnh trái, phía dưới */
+    left: 19%;
+  }
+
+  .math-icon-19 { 
+    top: 26%;      /* cạnh phải, đối xứng với 17 */
+    right: 19%;
+  }
+
+  .math-icon-20 { 
+    top: 66%;      /* cạnh phải, đối xứng với 18 */
+    right: 19%;
+  }
+.math-icon-17 { animation: driftSmallA 18s infinite; animation-delay: -5s; }
+.math-icon-18 { animation: driftSmallB 20s infinite; animation-delay: -7s; }
+.math-icon-19 { animation: driftSmallC 19s infinite; animation-delay: -6s; }
+.math-icon-20 { animation: driftSmallA 21s infinite; animation-delay: -8s; }
+.auto-math-icon {
+  opacity: 0.35;                         /* mờ hơn icon chính */
+  filter: drop-shadow(0 8px 20px rgba(0,0,0,0.18));
+}
+
+/* Nếu màn nhỏ thì ẩn icon random để đỡ rối */
+@media (max-width: 768px) {
+  .auto-math-icon {
+    display: none;
+  }
+}
