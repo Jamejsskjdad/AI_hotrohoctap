@@ -17,25 +17,24 @@ export default function App() {
   const [rawText, setRawText] = useState("");       // plain_text từ OCR
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [iconCount, setIconCount] = useState(20);
+  const [iconCount, setIconCount] = useState(30);   // số tối thiểu muốn có
+
   useEffect(() => {
     const update = () => {
-      const h = document.body.scrollHeight;
-  
-      // Tính số icon dựa trên chiều cao trang
-      // ví dụ: 1 icon trên mỗi 180px chiều cao
-      const count = Math.ceil(h / 180);
-  
+      const h = document.body.scrollHeight || window.innerHeight;
+
+      // Ví dụ: ~1 icon / 80px chiều cao, nhưng không ít hơn 30 cái
+      const count = Math.max(30, Math.ceil(h / 80));
+
       setIconCount(count);
     };
-  
-    update();
-  
-    // chạy lại mỗi khi resize hoặc thay đổi layout
+
+    update(); // chạy lần đầu
+
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [result]); // chạy lại mỗi khi kết quả được hiển thị
-  
+  }, [result]);
+
   // ===== Icon nền sinh ngẫu nhiên quanh khối card =====
   const autoIcons = useMemo(() => {
     const RANDOM_MATH_ICONS = [
