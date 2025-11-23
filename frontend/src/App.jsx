@@ -1,8 +1,9 @@
-import { useRef, useState, useMemo } from "react";
 import "./style.css";
 import MathBlock from "./components/MathBlock.jsx";
+import { useRef, useState, useMemo, useEffect } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8787";
+
 
 function safeStr(v) {
   const s = String(v ?? "").trim();
@@ -16,6 +17,25 @@ export default function App() {
   const [rawText, setRawText] = useState("");       // plain_text từ OCR
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [iconCount, setIconCount] = useState(20);
+  useEffect(() => {
+    const update = () => {
+      const h = document.body.scrollHeight;
+  
+      // Tính số icon dựa trên chiều cao trang
+      // ví dụ: 1 icon trên mỗi 180px chiều cao
+      const count = Math.ceil(h / 180);
+  
+      setIconCount(count);
+    };
+  
+    update();
+  
+    // chạy lại mỗi khi resize hoặc thay đổi layout
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [result]); // chạy lại mỗi khi kết quả được hiển thị
+  
   // ===== Icon nền sinh ngẫu nhiên quanh khối card =====
   const autoIcons = useMemo(() => {
     const RANDOM_MATH_ICONS = [
@@ -28,20 +48,18 @@ export default function App() {
       "fa-circle-dot",
     ];
     const DRIFTS = ["driftSmallA", "driftSmallB", "driftSmallC"];
-    const COUNT = 18; // số lượng icon random
-
-    return Array.from({ length: COUNT }).map((_, i) => {
+  
+    return Array.from({ length: iconCount }).map((_, i) => {
       const icon = RANDOM_MATH_ICONS[i % RANDOM_MATH_ICONS.length];
-
-      // Giới hạn vùng xuất hiện quanh card (khoảng 18–82% chiều ngang, 18–78% chiều dọc)
-      const left = 18 + Math.random() * 64;
-      const top = 18 + Math.random() * 60;
-
-      const size = 34 + (i % 5) * 4; // 34–50px
+  
+      const left = 12 + Math.random() * 76;   // sát khu vực trung tâm
+      const top = 5 + Math.random() * 90 * (i / iconCount); // trải đều theo chiều cao
+  
+      const size = 32 + (i % 5) * 5;
       const drift = DRIFTS[i % DRIFTS.length];
-      const duration = 16 + (i % 5) * 2; // 16–24s
-      const delay = -Math.random() * 20; // lệch nhịp
-
+      const duration = 14 + (i % 5) * 3;
+      const delay = -Math.random() * 20;
+  
       return (
         <i
           key={`auto-${i}`}
@@ -58,7 +76,8 @@ export default function App() {
         />
       );
     });
-  }, []);
+  }, [iconCount]);
+  
 
   async function handleFiles(e) {                    // NEW
     const files = Array.from(e.target.files || []);
